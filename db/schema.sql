@@ -1,0 +1,2 @@
+-- LendFi PostgreSQL Schema
+-- Full schema implemented in Step 6.

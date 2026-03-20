@@ -556,12 +556,20 @@ Stop after Step 0, then wait for approval: `Approved, go Step 1.` or `Fix Step 0
 ---
 
 ### Step 1 — Implement `MockUSDT.sol`
-What to do:
-1. Implement ERC-20 with a demo mint for testing (restricted).
-2. Use **18 decimals**.
 
-Verify:
-- compile succeeds
+**Goal:** Update the Step-0 placeholder in `hardhat/contracts/MockUSDT.sol` to fully support ERC-20 minting for local testing.
+
+**Implementation approach:**
+
+1. Add an `owner` set in the constructor and an `onlyOwner` modifier.
+2. Implement `demoMint(address to, uint256 amount)` so it updates `balances[to]` and `totalSupply`, and emits `Transfer(address(0), to, amount)`.
+3. Keep existing `transfer`, `transferFrom`, `approve`, `allowance`, and `balanceOf` logic (they already match the intended ERC-20 behavior model used by `LendingPool`).
+
+**Files involved:**
+- `hardhat/contracts/MockUSDT.sol`
+
+**Verification:**
+- `cd hardhat && npx hardhat compile` — must succeed
 
 ---
 

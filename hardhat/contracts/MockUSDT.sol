@@ -12,18 +12,29 @@ contract MockUSDT {
 
     uint256 public totalSupply;
 
+    address public owner;
+
     mapping(address => uint256) private balances;
     mapping(address => mapping(address => uint256)) private allowances;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "NOT_OWNER");
+        _;
+    }
+
     function balanceOf(address account) external view returns (uint256) {
         return balances[account];
     }
 
-    function allowance(address owner, address spender) external view returns (uint256) {
-        return allowances[owner][spender];
+    function allowance(address owner_, address spender) external view returns (uint256) {
+        return allowances[owner_][spender];
     }
 
     function approve(address spender, uint256 amount) external returns (bool) {
@@ -47,11 +58,15 @@ contract MockUSDT {
 
     /**
      * @notice Demo mint restricted mint for testing.
-     * Placeholder: will be implemented in Step 1.
+     * Restricted to the contract owner (deployer).
      */
-    function demoMint(address to, uint256 amount) external {
-        to; amount;
-        revert("DEMO_MINT_NOT_IMPLEMENTED");
+    function demoMint(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "ZERO_TO");
+        require(amount > 0, "ZERO_AMOUNT");
+
+        balances[to] += amount;
+        totalSupply += amount;
+        emit Transfer(address(0), to, amount);
     }
 
     function _transfer(address from, address to, uint256 amount) internal {
