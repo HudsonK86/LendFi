@@ -29,3 +29,6 @@ frontend/.eslintcache/
 .git_tmp/
 .git.bak_*/
 
+# Local notes / drafts (never commit)
+/implement.md
+
