@@ -38,6 +38,19 @@
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalSupply",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
   ],
   "bytecode": "0x",
@@ -46,5 +59,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/LendingPool.sol",
-  "buildInfoId": "solc-0_8_28-54d5b56649a9f3125591bd899e9c928292672092"
+  "buildInfoId": "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3"
 }

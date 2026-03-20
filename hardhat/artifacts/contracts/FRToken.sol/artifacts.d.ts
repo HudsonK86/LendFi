@@ -15,7 +15,7 @@ export interface FRToken$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/FRToken.sol";
-  readonly buildInfoId: "solc-0_8_28-54d5b56649a9f3125591bd899e9c928292672092";
+  readonly buildInfoId: "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3";
 };
 
 import "hardhat/types/artifacts";

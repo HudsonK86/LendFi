@@ -9,7 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": ["node", "mocha"]
   },
   "include": ["./hardhat.config.ts", "./scripts", "./test", "./ignition"]
 }
