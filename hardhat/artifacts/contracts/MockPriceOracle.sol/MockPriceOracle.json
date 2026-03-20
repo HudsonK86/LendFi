@@ -1,0 +1,71 @@
+{
+  "_format": "hh3-artifact-1",
+  "contractName": "MockPriceOracle",
+  "sourceName": "contracts/MockPriceOracle.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "getPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "price",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600e575f5ffd5b50600180546001600160a01b031916331790556101478061002e5f395ff3fe608060405234801561000f575f5ffd5b506004361061004a575f3560e01c80638da5cb5b1461004e57806391b7f5ed1461007e57806398d5fdca14610093578063a035b1fe146100a4575b5f5ffd5b600154610061906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b61009161008c3660046100fa565b6100ac565b005b5f545b604051908152602001610075565b6100965f5481565b6001546001600160a01b031633146100f65760405162461bcd60e51b81526020600482015260096024820152682727aa2fa7aba722a960b91b604482015260640160405180910390fd5b5f55565b5f6020828403121561010a575f5ffd5b503591905056fea2646970667358221220a1f19270b8ef2e8d63668dea8007269ea5cc4a65b3a9f3ceef006c2c45848d9d64736f6c634300081c0033",
+  "deployedBytecode": "0x608060405234801561000f575f5ffd5b506004361061004a575f3560e01c80638da5cb5b1461004e57806391b7f5ed1461007e57806398d5fdca14610093578063a035b1fe146100a4575b5f5ffd5b600154610061906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b61009161008c3660046100fa565b6100ac565b005b5f545b604051908152602001610075565b6100965f5481565b6001546001600160a01b031633146100f65760405162461bcd60e51b81526020600482015260096024820152682727aa2fa7aba722a960b91b604482015260640160405180910390fd5b5f55565b5f6020828403121561010a575f5ffd5b503591905056fea2646970667358221220a1f19270b8ef2e8d63668dea8007269ea5cc4a65b3a9f3ceef006c2c45848d9d64736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {},
+  "immutableReferences": {},
+  "inputSourceName": "project/contracts/MockPriceOracle.sol",
+  "buildInfoId": "solc-0_8_28-bbf654e65f13c8c9e2db75148cc30ca14038f8cb"
+}

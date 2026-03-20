@@ -1,0 +1,31 @@
+# Node / Next
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+.turbo/
+out/
+dist/
+build/
+
+# Logs
+*.log
+
+# Hardhat caches (avoid committing compilers / build artifacts)
+hardhat/.home/
+hardhat/.cache/
+frontend/.eslintcache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Env files (never commit)
+.env
+.env.*
+
+# Local git metadata (should never be committed)
+.git_tmp/
+.git.bak_*/
+
