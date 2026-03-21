@@ -14,6 +14,7 @@ build/
 # Hardhat caches (avoid committing compilers / build artifacts)
 hardhat/.home/
 hardhat/.cache/
+hardhat/.hardhat-test-cache/
 frontend/.eslintcache/
 
 # OS / editor
