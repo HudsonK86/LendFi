@@ -1,7 +1,0 @@
-{
-  "devDependencies": {
-    "chai": "^6.2.2",
-    "ethers": "^6.16.0",
-    "tsx": "^4.21.0"
-  }
-}
