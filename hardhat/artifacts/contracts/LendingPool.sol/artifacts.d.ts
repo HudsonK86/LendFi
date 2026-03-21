@@ -15,7 +15,7 @@ export interface IERC20Like$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/LendingPool.sol";
-  readonly buildInfoId: "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3";
+  readonly buildInfoId: "solc-0_8_28-3d31a6bbe8da2ee49a814a3e4b8c5a156821e3c1";
 };
 
 export interface IFRTokenLike$Type {
@@ -29,7 +29,7 @@ export interface IFRTokenLike$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/LendingPool.sol";
-  readonly buildInfoId: "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3";
+  readonly buildInfoId: "solc-0_8_28-3d31a6bbe8da2ee49a814a3e4b8c5a156821e3c1";
 };
 
 export interface IPriceOracleLike$Type {
@@ -43,7 +43,7 @@ export interface IPriceOracleLike$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/LendingPool.sol";
-  readonly buildInfoId: "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3";
+  readonly buildInfoId: "solc-0_8_28-3d31a6bbe8da2ee49a814a3e4b8c5a156821e3c1";
 };
 
 export interface LendingPool$Type {
@@ -57,7 +57,7 @@ export interface LendingPool$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/LendingPool.sol";
-  readonly buildInfoId: "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3";
+  readonly buildInfoId: "solc-0_8_28-3d31a6bbe8da2ee49a814a3e4b8c5a156821e3c1";
 };
 
 import "hardhat/types/artifacts";
