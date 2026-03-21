@@ -10,6 +10,7 @@ build/
 
 # Logs
 *.log
+*.tsbuildinfo
 
 # Hardhat caches (avoid committing compilers / build artifacts)
 hardhat/.home/
