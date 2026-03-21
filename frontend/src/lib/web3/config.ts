@@ -9,6 +9,8 @@ export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || "";
 export const hardhatNetwork = defineChain({
   id: 31337,
   name: "Hardhat",
+  chainNamespace: "eip155",
+  caipNetworkId: "eip155:31337",
   nativeCurrency: {
     name: "Ethereum",
     symbol: "ETH",
