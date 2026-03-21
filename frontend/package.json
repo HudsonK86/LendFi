@@ -9,12 +9,15 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@reown/appkit": "^1.8.19",
+    "@reown/appkit-adapter-wagmi": "^1.8.19",
     "@tanstack/react-query": "^5.91.3",
     "iron-session": "^8.0.4",
     "next": "^16.2.0",
     "pg": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-toastify": "^11.0.5",
     "viem": "^2.47.5",
     "wagmi": "^3.5.0"
   },

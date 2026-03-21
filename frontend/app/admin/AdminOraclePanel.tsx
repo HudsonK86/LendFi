@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { isAddress } from "viem";
 import {
   useAccount,
-  useConnect,
-  useDisconnect,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
 
 import { MockPriceOracle_ABI } from "@/lib/abi";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 
 const oracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as
   | `0x${string}`
@@ -28,12 +28,16 @@ function shortAddress(address?: string): string {
 export function AdminOraclePanel() {
   const [nextPrice, setNextPrice] = useState("");
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
-  const { disconnect } = useDisconnect();
   const { data: hash, writeContract, isPending: isWriting, error: writeError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
+  useEffect(() => {
+    if (isConfirmed) toast.success("Oracle price update confirmed");
+  }, [isConfirmed]);
+  useEffect(() => {
+    if (writeError) toast.error(writeError.message);
+  }, [writeError]);
 
   const ownerRead = useReadContract({
     abi: MockPriceOracle_ABI,
@@ -109,27 +113,13 @@ export function AdminOraclePanel() {
       </div>
 
       {!isConnected ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {connectors.map((connector) => (
-            <button
-              key={connector.uid}
-              type="button"
-              disabled={isConnecting}
-              onClick={() => connect({ connector })}
-              className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
-              Connect {connector.name}
-            </button>
-          ))}
+        <div className="mt-4">
+          <WalletConnectButton />
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => disconnect()}
-          className="mt-4 rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
-        >
-          Disconnect wallet
-        </button>
+        <div className="mt-4">
+          <WalletConnectButton />
+        </div>
       )}
 
       {walletMismatch ? (
