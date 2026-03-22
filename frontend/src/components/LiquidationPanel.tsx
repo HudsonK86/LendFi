@@ -163,18 +163,12 @@ export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
       </p>
 
       {poolConfigured ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          {scanLoading ? <span>Checking positions…</span> : null}
-          {noLiquidatable ? <span>Nothing to liquidate right now.</span> : null}
-          <button
-            type="button"
-            onClick={() => void scanRead.refetch()}
-            disabled={scanRead.isFetching}
-            className={btnNeutral}
-          >
-            {scanRead.isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
+        scanLoading || noLiquidatable ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            {scanLoading ? <span>Checking positions…</span> : null}
+            {noLiquidatable ? <span>Nothing to liquidate right now.</span> : null}
+          </div>
+        ) : null
       ) : (
         <p className="mt-3 text-sm text-amber-400/90">Configure the lending pool in the app settings.</p>
       )}

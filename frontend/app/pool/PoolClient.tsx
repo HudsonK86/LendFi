@@ -7,6 +7,7 @@ import { formatUnits, isAddress, parseUnits } from "viem";
 import {
   useAccount,
   useReadContract,
+  useReadContracts,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
@@ -15,6 +16,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { LiquidationPanel } from "@/components/LiquidationPanel";
 import { StatTile } from "@/components/StatTile";
 import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { getLiquidationScanAddresses } from "@/lib/liquidation-scan-addresses";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
 
@@ -37,6 +39,19 @@ function fmtPctBps(bps?: bigint) {
 function fmtToken(value?: bigint, digits = 4) {
   if (value == null) return "—";
   return Number(formatUnits(value, 18)).toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function fmtEthWei(wei?: bigint, digits = 6) {
+  if (wei == null) return "—";
+  return `${Number(formatUnits(wei, 18)).toLocaleString("en-US", { maximumFractionDigits: digits })} ETH`;
+}
+
+type MulticallRow = { status: "success" | "failure"; result?: unknown };
+
+function asBigint(row: MulticallRow | undefined): bigint | undefined {
+  if (!row || row.status !== "success") return undefined;
+  const r = row.result;
+  return typeof r === "bigint" ? r : undefined;
 }
 
 export function PoolClient() {
@@ -151,6 +166,81 @@ export function PoolClient() {
   const oracleRaw = oraclePrice.data as bigint | undefined;
   const oracleHuman = oracleRaw != null ? formatUnits(oracleRaw, 18) : null;
 
+  const scanAddresses = useMemo(() => getLiquidationScanAddresses(), []);
+
+  const liquidationScanContracts = useMemo(
+    () =>
+      lendingPoolAddress
+        ? scanAddresses.flatMap((addr) => [
+            {
+              address: lendingPoolAddress,
+              abi: LendingPool_ABI,
+              functionName: "getHealthFactor" as const,
+              args: [addr],
+            },
+            {
+              address: lendingPoolAddress,
+              abi: LendingPool_ABI,
+              functionName: "debtUSDT" as const,
+              args: [addr],
+            },
+            {
+              address: lendingPoolAddress,
+              abi: LendingPool_ABI,
+              functionName: "collateralETH" as const,
+              args: [addr],
+            },
+          ])
+        : [],
+    [scanAddresses],
+  );
+
+  const liquidationScanRead = useReadContracts({
+    contracts: liquidationScanContracts,
+    query: {
+      enabled: Boolean(lendingPoolAddress && liquidationScanContracts.length > 0),
+      staleTime: 12_000,
+    },
+  });
+
+  const eligibleUnderwaterRows = useMemo(() => {
+    const scanData = liquidationScanRead.data;
+    if (!scanData?.length || !scanAddresses.length) return [];
+    const rows: { hf: bigint; debt: bigint; coll: bigint }[] = [];
+    for (let i = 0; i < scanAddresses.length; i++) {
+      const base = i * 3;
+      const hfVal = asBigint(scanData[base] as MulticallRow);
+      const debtVal = asBigint(scanData[base + 1] as MulticallRow);
+      const collVal = asBigint(scanData[base + 2] as MulticallRow);
+      if (hfVal == null || debtVal == null || collVal == null) continue;
+      if (debtVal === 0n) continue;
+      if (hfVal >= 10n ** 18n) continue;
+      rows.push({ hf: hfVal, debt: debtVal, coll: collVal });
+    }
+    return rows;
+  }, [liquidationScanRead.data, scanAddresses]);
+
+  const totalEthBlockedScan = useMemo(() => {
+    const scanData = liquidationScanRead.data;
+    if (!scanData?.length || !scanAddresses.length) return undefined;
+    let sum = 0n;
+    for (let i = 0; i < scanAddresses.length; i++) {
+      const collVal = asBigint(scanData[i * 3 + 2] as MulticallRow);
+      if (collVal != null) sum += collVal;
+    }
+    return sum;
+  }, [liquidationScanRead.data, scanAddresses]);
+
+  const totalBorrowedHfLt1 = useMemo(
+    () => eligibleUnderwaterRows.reduce((acc, r) => acc + r.debt, 0n),
+    [eligibleUnderwaterRows],
+  );
+
+  const totalEthBlockedHfLt1 = useMemo(
+    () => eligibleUnderwaterRows.reduce((acc, r) => acc + r.coll, 0n),
+    [eligibleUnderwaterRows],
+  );
+
   const {
     data: approveHash,
     writeContract: writeApprove,
@@ -257,6 +347,16 @@ export function PoolClient() {
           <StatTile label="Total borrowed (USDT)" value={fmt(totalBorrowed.data as bigint | undefined)} />
           <StatTile label="Available liquidity (USDT)" value={fmt(availableLiquidity.data as bigint | undefined)} />
           <StatTile label="Reserves (USDT)" value={fmt(totalReserves.data as bigint | undefined)} />
+          <StatTile
+            label="Total ETH blocked (ETH)"
+            value={
+              liquidationScanRead.isPending && !liquidationScanRead.data
+                ? "—"
+                : totalEthBlockedScan != null
+                  ? fmtEthWei(totalEthBlockedScan)
+                  : "—"
+            }
+          />
           <StatTile label="Utilization (%)" value={fmtPctBps(utilization.data as bigint | undefined)} />
           <StatTile
             label="Borrow APY (%)"
@@ -264,6 +364,22 @@ export function PoolClient() {
             hint="Variable from model"
           />
           <StatTile label="Supply APY (%)" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
+          <StatTile
+            label="Total borrowed, HF < 1 (USDT)"
+            value={
+              liquidationScanRead.isPending && !liquidationScanRead.data
+                ? "—"
+                : fmt(totalBorrowedHfLt1)
+            }
+          />
+          <StatTile
+            label="Total ETH blocked, HF < 1 (ETH)"
+            value={
+              liquidationScanRead.isPending && !liquidationScanRead.data
+                ? "—"
+                : fmtEthWei(totalEthBlockedHfLt1)
+            }
+          />
           <StatTile
             label="ETH / USDT oracle"
             value={oracleHuman != null ? `${Number(oracleHuman).toLocaleString("en-US")} USDT/ETH` : "—"}
