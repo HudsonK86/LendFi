@@ -7,7 +7,7 @@ import { useAccount, useReadContract } from "wagmi";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI } from "@/lib/abi";
-import { card, code, input, label, shell, tableWrap, td, th } from "@/lib/ui";
+import { card, code, shell, tableWrap, td, th } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtOracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as `0x${string}` | undefined;
@@ -15,7 +15,7 @@ const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` 
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
-  return Number(formatUnits(value, decimals)).toLocaleString(undefined, { maximumFractionDigits: digits });
+  return Number(formatUnits(value, decimals)).toLocaleString("en-US", { maximumFractionDigits: digits });
 }
 
 function fmtPctBps(value?: bigint) {
@@ -25,21 +25,16 @@ function fmtPctBps(value?: bigint) {
 
 export function DashboardClient() {
   const [mounted, setMounted] = useState(false);
-  const [borrowerAddressInput, setBorrowerAddressInput] = useState("");
-  const [lenderAddressInput, setLenderAddressInput] = useState("");
 
   const { address } = useAccount();
 
   useEffect(() => setMounted(true), []);
 
-  const borrowerAddress = useMemo(
-    () => (isAddress(borrowerAddressInput.trim()) ? (borrowerAddressInput.trim() as `0x${string}`) : undefined),
-    [borrowerAddressInput],
+  /** Dashboard is scoped to the MetaMask-connected account only. */
+  const connectedAddress = useMemo(
+    () => (address && isAddress(address) ? address : undefined),
+    [address],
   );
-  const lenderAddress = useMemo(() => {
-    const preferred = lenderAddressInput.trim() || address;
-    return preferred && isAddress(preferred) ? (preferred as `0x${string}`) : undefined;
-  }, [address, lenderAddressInput]);
 
   const availableLiquidity = useReadContract({
     abi: LendingPool_ABI,
@@ -94,8 +89,8 @@ export function DashboardClient() {
     abi: FRToken_ABI,
     address: frTokenAddress,
     functionName: "balanceOf",
-    args: lenderAddress ? [lenderAddress] : undefined,
-    query: { enabled: Boolean(frTokenAddress && lenderAddress) },
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: { enabled: Boolean(frTokenAddress && connectedAddress) },
   });
   const frTotalSupply = useReadContract({
     abi: FRToken_ABI,
@@ -122,29 +117,29 @@ export function DashboardClient() {
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "collateralETH",
-    args: borrowerAddress ? [borrowerAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && borrowerAddress) },
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
   });
   const borrowerDebt = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "debtUSDT",
-    args: borrowerAddress ? [borrowerAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && borrowerAddress) },
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
   });
   const borrowerMaxBorrow = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "getMaxBorrow",
-    args: borrowerAddress ? [borrowerAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && borrowerAddress) },
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
   });
   const borrowerHF = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "getHealthFactor",
-    args: borrowerAddress ? [borrowerAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && borrowerAddress) },
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
   });
 
   const canRender = mounted && isAddress(String(lendingPoolAddress)) && isAddress(String(frTokenAddress));
@@ -155,7 +150,10 @@ export function DashboardClient() {
 
   return (
     <main className={shell}>
-      <PageHeader title="Dashboard" subtitle="Protocol metrics and position views from the chain." />
+      <PageHeader
+        title="Dashboard"
+        subtitle="Protocol overview plus your lender and borrower positions for the connected wallet."
+      />
 
       {!canRender ? (
         <p className="mt-4 text-sm text-red-400">
@@ -181,24 +179,26 @@ export function DashboardClient() {
               <StatTile label="Supply APY" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
               <StatTile
                 label="ETH / USDT oracle"
-                value={oracleHuman != null ? `${Number(oracleHuman).toLocaleString()} USDT/ETH` : "—"}
+                value={oracleHuman != null ? `${Number(oracleHuman).toLocaleString("en-US")} USDT/ETH` : "—"}
                 hint={oracleRaw != null ? `Raw ${oracleRaw.toString()}` : undefined}
               />
             </div>
           </section>
 
           <section className={`${card} mt-8`}>
-            <h2 className="text-base font-semibold text-slate-100">Lender view</h2>
-            <label className="mt-4 block text-sm text-slate-300">
-              <span className={label}>Lender address</span>
-              <span className="ml-2 text-xs font-normal text-slate-500">(optional — defaults to connected wallet)</span>
-              <input
-                value={lenderAddressInput}
-                onChange={(e) => setLenderAddressInput(e.target.value)}
-                placeholder={address ?? "0x…"}
-                className={input}
-              />
-            </label>
+            <h2 className="text-base font-semibold text-slate-100">Your lender position</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              {connectedAddress ? (
+                <>
+                  Connected:{" "}
+                  <span className="font-mono text-slate-400">
+                    {connectedAddress.slice(0, 6)}…{connectedAddress.slice(-4)}
+                  </span>
+                </>
+              ) : (
+                "Connect your wallet to see your FR balance and withdrawable estimate."
+              )}
+            </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <StatTile label="FR balance" value={fmt(lenderFrBalance.data as bigint | undefined)} />
               <StatTile label="FR total supply" value={fmt(frTotalSupply.data as bigint | undefined)} />
@@ -207,16 +207,16 @@ export function DashboardClient() {
           </section>
 
           <section className={`${card} mt-6`}>
-            <h2 className="text-base font-semibold text-slate-100">Borrower view</h2>
-            <label className="mt-4 block text-sm text-slate-300">
-              <span className={label}>Borrower address</span>
-              <input
-                value={borrowerAddressInput}
-                onChange={(e) => setBorrowerAddressInput(e.target.value)}
-                placeholder="0x…"
-                className={input}
-              />
-            </label>
+            <h2 className="text-base font-semibold text-slate-100">Your borrower position</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              {connectedAddress ? (
+                <>
+                  Same wallet as above — collateral, debt, and health for this address.
+                </>
+              ) : (
+                "Connect your wallet to see collateral, debt, and health factor."
+              )}
+            </p>
             <div className={`${tableWrap} mt-6`}>
               <table className="w-full min-w-[520px] border-collapse text-sm">
                 <thead className="border-b border-slate-800 bg-slate-950/50">
@@ -235,7 +235,7 @@ export function DashboardClient() {
                     <td className={`${td} tabular-nums`}>{fmt(borrowerMaxBorrow.data as bigint | undefined)}</td>
                     <td className={`${td} tabular-nums`}>{fmt(borrowerHF.data as bigint | undefined, 18, 3)}</td>
                     <td className={td}>
-                      {borrowerAddress ? (
+                      {connectedAddress ? (
                         <span className={isLiquidatable ? "font-medium text-red-400" : "font-medium text-emerald-400/90"}>
                           {isLiquidatable ? "Yes" : "No"}
                         </span>
