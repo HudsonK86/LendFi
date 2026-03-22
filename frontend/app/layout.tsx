@@ -1,58 +1,35 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { WalletBalance } from "@/components/WalletBalance";
-import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { Inter } from "next/font/google";
+
+import { AppHeader } from "@/components/AppHeader";
 import "./globals.css";
 import { Providers } from "./providers";
 
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+
 export const metadata: Metadata = {
   title: "LendFi",
-  description: "MVP lending demo"
+  description: "Shared-pool lending demo — supply liquidity, borrow with ETH collateral, monitor risk.",
 };
 
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className={inter.className}>
+      <body className="min-h-screen antialiased">
         <Providers>
-          <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/90 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-5">
-                <Link href="/" className="text-lg font-semibold">
-                  LendFi
-                </Link>
-                <nav className="flex items-center gap-3 text-sm text-neutral-700">
-                  <Link href="/pool" className="hover:text-neutral-900">
-                    Pool
-                  </Link>
-                  <Link href="/borrow" className="hover:text-neutral-900">
-                    Borrow
-                  </Link>
-                  <Link href="/dashboard" className="hover:text-neutral-900">
-                    Dashboard
-                  </Link>
-                  <Link href="/liquidations" className="hover:text-neutral-900">
-                    Liquidations
-                  </Link>
-                  <Link href="/admin" className="hover:text-neutral-900">
-                    Admin
-                  </Link>
-                </nav>
-              </div>
-              <div className="flex items-center gap-2">
-                <WalletBalance />
-                <WalletConnectButton />
-              </div>
-            </div>
-          </header>
-          {children}
+          <div className="flex min-h-screen flex-col">
+            <AppHeader />
+            <div className="flex-1">{children}</div>
+            <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
+              LendFi · MVP lending interface · Local dev only
+            </footer>
+          </div>
         </Providers>
       </body>
     </html>
   );
 }
-

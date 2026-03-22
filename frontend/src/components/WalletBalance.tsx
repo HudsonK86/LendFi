@@ -9,7 +9,7 @@ export function WalletBalance() {
 
   if (!isConnected || !data) return null;
   return (
-    <span className="rounded bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+    <span className="hidden rounded-lg border border-slate-700/80 bg-slate-900/80 px-2.5 py-1 font-mono text-xs text-slate-200 sm:inline-block">
       {Number(formatUnits(data.value, data.decimals)).toFixed(4)} {data.symbol}
     </span>
   );

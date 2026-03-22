@@ -23,7 +23,7 @@ export function SignOutButton() {
       type="button"
       disabled={loading}
       onClick={() => void signOut()}
-      className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50"
+      className="rounded-lg border border-slate-600 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800 disabled:opacity-50"
     >
       {loading ? "Signing out…" : "Sign out"}
     </button>

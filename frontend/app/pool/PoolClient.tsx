@@ -11,20 +11,22 @@ import {
   useWriteContract,
 } from "wagmi";
 
+import { PageHeader } from "@/components/PageHeader";
 import { FRToken_ABI, LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { btnNeutral, btnPrimary, card, code, input, label, shell, tableWrap, td, th } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
 const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` | undefined;
 
 function fmtToken(value?: bigint, digits = 4) {
-  if (value == null) return "-";
+  if (value == null) return "—";
   return Number(formatUnits(value, 18)).toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
 function fmtPct(bps?: bigint) {
-  if (bps == null) return "-";
+  if (bps == null) return "—";
   return `${(Number(bps) / 100).toFixed(2)}%`;
 }
 
@@ -170,112 +172,163 @@ export function PoolClient() {
     Boolean(isAddress(String(lendingPoolAddress)));
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="text-2xl font-semibold">Lender pool</h1>
-      <p className="mt-2 text-sm text-neutral-600">Approve MockUSDT, deposit into pool, and withdraw with FR shares.</p>
+    <main className={shell}>
+      <PageHeader
+        title="Pool"
+        subtitle="Supply MockUSDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
+      />
 
-      <div className="mt-4 rounded border border-neutral-200 p-4 text-sm">
-        <p>
-          LendingPool: <code className="rounded bg-neutral-100 px-1">{lendingPoolAddress || "missing env"}</code>
-        </p>
-        <p>
-          MockUSDT: <code className="rounded bg-neutral-100 px-1">{usdtAddress || "missing env"}</code>
-        </p>
-        <p>
-          FRToken: <code className="rounded bg-neutral-100 px-1">{frTokenAddress || "missing env"}</code>
-        </p>
+      <div className={card}>
+        <p className={label}>Contract addresses</p>
+        <div className="mt-3 grid gap-2 text-sm text-slate-300">
+          <p>
+            LendingPool <code className={code}>{lendingPoolAddress || "missing env"}</code>
+          </p>
+          <p>
+            MockUSDT <code className={code}>{usdtAddress || "missing env"}</code>
+          </p>
+          <p>
+            FRToken <code className={code}>{frTokenAddress || "missing env"}</code>
+          </p>
+        </div>
       </div>
 
       {!mounted ? (
-        <p className="mt-6 text-sm text-neutral-500">Loading wallet...</p>
+        <p className="mt-8 text-sm text-slate-500">Loading wallet…</p>
       ) : !isConnected ? (
-        <div className="mt-6">
-          <WalletConnectButton />
+        <div className="mt-8 rounded-xl border border-slate-800 bg-slate-950/50 p-8 text-center">
+          <p className="text-sm text-slate-400">Connect a wallet to supply or withdraw.</p>
+          <div className="mt-4 flex justify-center">
+            <WalletConnectButton />
+          </div>
         </div>
       ) : (
-        <p className="mt-6 text-sm text-neutral-700">
-          Connected: <code className="rounded bg-neutral-100 px-1">{address}</code>
+        <p className="mt-6 text-sm text-slate-400">
+          Connected <code className={code}>{address}</code>
         </p>
       )}
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h2 className="font-medium">Protocol stats</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <p>Available liquidity: {fmtToken(availableLiquidity.data as bigint | undefined)}</p>
-          <p>Total supplied: {fmtToken(totalSupplied.data as bigint | undefined)}</p>
-          <p>Total borrowed: {fmtToken(totalBorrowed.data as bigint | undefined)}</p>
-          <p>Utilization: {fmtPct(utilization.data as bigint | undefined)}</p>
-          <p>Supply APY: {fmtPct(supplyApy.data as bigint | undefined)}</p>
-          <p>Borrow APY: {fmtPct(borrowApy.data as bigint | undefined)}</p>
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market</h2>
+        <div className={`${tableWrap} mt-3`}>
+          <table className="w-full min-w-[640px] border-collapse">
+            <thead className="border-b border-slate-800 bg-slate-950/50">
+              <tr>
+                <th className={th}>Asset</th>
+                <th className={th}>Total supplied</th>
+                <th className={th}>Total borrowed</th>
+                <th className={th}>Available</th>
+                <th className={th}>Utilization</th>
+                <th className={th}>Supply APY</th>
+                <th className={th}>Borrow APY</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-slate-800/80 bg-slate-900/20">
+                <td className={td}>
+                  <span className="font-medium text-slate-100">MockUSDT</span>
+                  <span className="ml-2 text-xs text-slate-500">→ FR</span>
+                </td>
+                <td className={`${td} tabular-nums`}>{fmtToken(totalSupplied.data as bigint | undefined)}</td>
+                <td className={`${td} tabular-nums`}>{fmtToken(totalBorrowed.data as bigint | undefined)}</td>
+                <td className={`${td} tabular-nums`}>{fmtToken(availableLiquidity.data as bigint | undefined)}</td>
+                <td className={`${td} tabular-nums`}>{fmtPct(utilization.data as bigint | undefined)}</td>
+                <td className={`${td} tabular-nums text-emerald-400/90`}>
+                  {fmtPct(supplyApy.data as bigint | undefined)}
+                </td>
+                <td className={`${td} tabular-nums text-amber-300/90`}>
+                  {fmtPct(borrowApy.data as bigint | undefined)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h2 className="font-medium">Your balances</h2>
-        <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-          <p>USDT: {fmtToken(usdtBalance.data as bigint | undefined)}</p>
-          <p>FR: {fmtToken(frBalance.data as bigint | undefined)}</p>
-          <p>Allowance to pool: {fmtToken(allowance.data as bigint | undefined)}</p>
-        </div>
-      </section>
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className={card}>
+          <h2 className="text-base font-semibold text-slate-100">Your balances</h2>
+          <div className="mt-4 grid gap-3 text-sm">
+            <div className="flex justify-between border-b border-slate-800/80 py-2">
+              <span className="text-slate-500">Wallet USDT</span>
+              <span className="tabular-nums font-medium text-slate-100">
+                {fmtToken(usdtBalance.data as bigint | undefined)}
+              </span>
+            </div>
+            <div className="flex justify-between border-b border-slate-800/80 py-2">
+              <span className="text-slate-500">FR (pool shares)</span>
+              <span className="tabular-nums font-medium text-slate-100">
+                {fmtToken(frBalance.data as bigint | undefined)}
+              </span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-slate-500">Allowance to pool</span>
+              <span className="tabular-nums font-medium text-slate-100">
+                {fmtToken(allowance.data as bigint | undefined)}
+              </span>
+            </div>
+          </div>
+        </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h2 className="font-medium">Deposit USDT</h2>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            Amount (USDT)
+        <section className={card}>
+          <h2 className="text-base font-semibold text-slate-100">Deposit USDT</h2>
+          <p className="mt-1 text-xs text-slate-500">Approve once if needed, then deposit into the pool.</p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-sm text-slate-300">
+              <span className={label}>Amount</span>
+              <input
+                className={input}
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                placeholder="1000"
+              />
+            </label>
+            {needsApprove ? (
+              <button
+                type="button"
+                disabled={!isConnected || !ready || !parsedDeposit || isApprovePending || approveReceipt.isLoading}
+                onClick={() =>
+                  writeApprove({
+                    abi: MockUSDT_ABI,
+                    address: usdtAddress!,
+                    functionName: "approve",
+                    args: [lendingPoolAddress!, parsedDeposit!],
+                  })
+                }
+                className={btnNeutral}
+              >
+                {isApprovePending || approveReceipt.isLoading ? "Approving…" : "Approve USDT"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!isConnected || !ready || !parsedDeposit || isDepositPending || depositReceipt.isLoading}
+                onClick={() =>
+                  writeDeposit({
+                    abi: LendingPool_ABI,
+                    address: lendingPoolAddress!,
+                    functionName: "depositLiquidity",
+                    args: [parsedDeposit!],
+                  })
+                }
+                className={btnPrimary}
+              >
+                {isDepositPending || depositReceipt.isLoading ? "Depositing…" : "Deposit"}
+              </button>
+            )}
+          </div>
+          {approveError ? <p className="mt-2 text-sm text-red-400">{approveError.message}</p> : null}
+          {depositError ? <p className="mt-2 text-sm text-red-400">{depositError.message}</p> : null}
+        </section>
+      </div>
+
+      <section className={`${card} mt-6`}>
+        <h2 className="text-base font-semibold text-slate-100">Withdraw (burn FR)</h2>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex-1 text-sm text-slate-300">
+            <span className={label}>FR amount</span>
             <input
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-              value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
-              placeholder="100"
-            />
-          </label>
-          {needsApprove ? (
-            <button
-              type="button"
-              disabled={!isConnected || !ready || !parsedDeposit || isApprovePending || approveReceipt.isLoading}
-              onClick={() =>
-                writeApprove({
-                  abi: MockUSDT_ABI,
-                  address: usdtAddress!,
-                  functionName: "approve",
-                  args: [lendingPoolAddress!, parsedDeposit!],
-                })
-              }
-              className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
-              {isApprovePending || approveReceipt.isLoading ? "Approving..." : "Approve USDT"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!isConnected || !ready || !parsedDeposit || isDepositPending || depositReceipt.isLoading}
-              onClick={() =>
-                writeDeposit({
-                  abi: LendingPool_ABI,
-                  address: lendingPoolAddress!,
-                  functionName: "depositLiquidity",
-                  args: [parsedDeposit!],
-                })
-              }
-              className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
-              {isDepositPending || depositReceipt.isLoading ? "Depositing..." : "Deposit"}
-            </button>
-          )}
-        </div>
-        {approveError ? <p className="mt-2 text-sm text-red-600">{approveError.message}</p> : null}
-        {depositError ? <p className="mt-2 text-sm text-red-600">{depositError.message}</p> : null}
-      </section>
-
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h2 className="font-medium">Withdraw by FR amount</h2>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            FR amount
-            <input
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className={input}
               value={withdrawFrAmount}
               onChange={(e) => setWithdrawFrAmount(e.target.value)}
               placeholder="50"
@@ -292,27 +345,28 @@ export function PoolClient() {
                 args: [parsedWithdrawFr!],
               })
             }
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+            className={btnPrimary}
           >
-            {isWithdrawPending || withdrawReceipt.isLoading ? "Withdrawing..." : "Withdraw"}
+            {isWithdrawPending || withdrawReceipt.isLoading ? "Withdrawing…" : "Withdraw"}
           </button>
         </div>
-        {withdrawError ? <p className="mt-2 text-sm text-red-600">{withdrawError.message}</p> : null}
+        {withdrawError ? <p className="mt-2 text-sm text-red-400">{withdrawError.message}</p> : null}
       </section>
 
       {!ready ? (
-        <p className="mt-6 text-sm text-red-600">
-          Missing or invalid contract env addresses. Set `NEXT_PUBLIC_LENDING_POOL_ADDRESS`,
-          `NEXT_PUBLIC_MOCK_USDT_ADDRESS`, and `NEXT_PUBLIC_FRTOKEN_ADDRESS` in `frontend/.env`.
+        <p className="mt-8 text-sm text-red-400">
+          Set <code className={code}>NEXT_PUBLIC_LENDING_POOL_ADDRESS</code>,{" "}
+          <code className={code}>NEXT_PUBLIC_MOCK_USDT_ADDRESS</code>, and{" "}
+          <code className={code}>NEXT_PUBLIC_FRTOKEN_ADDRESS</code> in <code className={code}>frontend/.env</code>.
         </p>
       ) : null}
 
-      <div className="mt-8 flex gap-4 text-sm">
-        <Link href="/" className="text-blue-600 underline">
-          Home
+      <div className="mt-10 flex flex-wrap gap-4 text-sm">
+        <Link href="/" className="text-cyan-400/90 hover:text-cyan-300">
+          ← Home
         </Link>
-        <Link href="/admin" className="text-blue-600 underline">
-          Admin
+        <Link href="/borrow" className="text-cyan-400/90 hover:text-cyan-300">
+          Borrow →
         </Link>
       </div>
     </main>

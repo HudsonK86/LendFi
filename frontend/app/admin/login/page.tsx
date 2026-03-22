@@ -7,7 +7,7 @@ export default function AdminLoginPage() {
     <Suspense
       fallback={
         <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-          <p className="text-neutral-500">Loading…</p>
+          <p className="text-slate-500">Loading…</p>
         </main>
       }
     >

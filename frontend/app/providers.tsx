@@ -23,7 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }}
       themeMode="dark"
       themeVariables={{
-        "--w3m-accent": "#4f46e5",
+        "--w3m-accent": "#06b6d4",
       }}
     >
       <WagmiProvider config={wagmiConfig}>

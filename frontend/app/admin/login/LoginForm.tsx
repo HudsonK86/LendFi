@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { btnPrimary, input, label } from "@/lib/ui";
+
 export function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,13 +37,19 @@ export function AdminLoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
-      <h1 className="text-2xl font-semibold">Admin login</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Username
+    <main className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center gap-8 px-4">
+      <div>
+        <div className="mb-3 inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-amber-200/90">
+          Admin
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-50">Sign in</h1>
+        <p className="mt-2 text-sm text-slate-400">Access oracle and protocol admin tools.</p>
+      </div>
+      <form onSubmit={onSubmit} className="flex flex-col gap-5 rounded-xl border border-slate-800/90 bg-slate-900/40 p-6 shadow-xl shadow-black/30">
+        <label className="flex flex-col gap-1.5 text-sm text-slate-300">
+          <span className={label}>Username</span>
           <input
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={input}
             name="username"
             autoComplete="username"
             value={username}
@@ -49,10 +57,10 @@ export function AdminLoginForm() {
             required
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
+        <label className="flex flex-col gap-1.5 text-sm text-slate-300">
+          <span className={label}>Password</span>
           <input
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={input}
             name="password"
             type="password"
             autoComplete="current-password"
@@ -61,12 +69,8 @@ export function AdminLoginForm() {
             required
           />
         </label>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50"
-        >
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>

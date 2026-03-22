@@ -11,23 +11,47 @@ import {
   useWriteContract,
 } from "wagmi";
 
+import { PageHeader } from "@/components/PageHeader";
 import { LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { StatTile } from "@/components/StatTile";
+import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
-  if (value == null) return "-";
+  if (value == null) return "—";
   return Number(formatUnits(value, decimals)).toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
 function hfLabel(hf?: bigint) {
-  if (hf == null) return { text: "-", cls: "text-neutral-600" };
+  if (hf == null) return { text: "—", barColor: "bg-slate-600", textClass: "text-slate-400" };
   const n = Number(formatUnits(hf, 18));
-  if (n < 1) return { text: n.toFixed(3), cls: "text-red-600" };
-  if (n < 1.25) return { text: n.toFixed(3), cls: "text-amber-600" };
-  return { text: n.toFixed(3), cls: "text-green-700" };
+  if (n < 1) return { text: n.toFixed(3), barColor: "bg-red-500", textClass: "text-red-400" };
+  if (n < 1.25) return { text: n.toFixed(3), barColor: "bg-amber-400", textClass: "text-amber-300" };
+  return { text: n.toFixed(3), barColor: "bg-emerald-400", textClass: "text-emerald-300" };
+}
+
+function HealthFactorBar({ hf }: { hf?: bigint }) {
+  const n = hf == null ? 0 : Number(formatUnits(hf, 18));
+  const pct = Math.min(100, Math.max(0, (n / 2) * 100));
+  const hfStyle = hfLabel(hf);
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>Risk meter (0–2 scale)</span>
+        <span className={hfStyle.textClass}>HF {hfStyle.text}</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+        <div
+          className={`h-full rounded-full transition-all ${hfStyle.barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1 text-[11px] text-slate-500">&lt;1 liquidatable · ≥1.25 safer buffer</p>
+    </div>
+  );
 }
 
 export function BorrowClient() {
@@ -184,197 +208,224 @@ export function BorrowClient() {
     parsedRepay != null && (usdtAllowanceRead.data as bigint | undefined ?? 0n) < parsedRepay;
   const hf = hfLabel(hfRead.data as bigint | undefined);
 
+  const hasPosition =
+    (collateralRead.data as bigint | undefined ?? 0n) > 0n ||
+    (debtRead.data as bigint | undefined ?? 0n) > 0n;
+
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="text-2xl font-semibold">Borrower position</h1>
-      <p className="mt-2 text-sm text-neutral-600">Manage collateral, borrow USDT, repay debt, and withdraw collateral.</p>
+    <main className={shell}>
+      <PageHeader
+        title="Borrow"
+        subtitle="Deposit ETH collateral, borrow MockUSDT against it, and keep health factor above 1 to avoid liquidation."
+      />
 
       {!mounted ? (
-        <p className="mt-6 text-sm text-neutral-500">Loading wallet...</p>
+        <p className="text-sm text-slate-500">Loading wallet…</p>
       ) : !isConnected ? (
-        <div className="mt-6">
-          <WalletConnectButton />
+        <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-8 text-center">
+          <p className="text-sm text-slate-400">Connect your wallet to manage a borrow position.</p>
+          <div className="mt-4 flex justify-center">
+            <WalletConnectButton />
+          </div>
         </div>
       ) : (
-        <p className="mt-6 text-sm text-neutral-700">
-          Connected: <code className="rounded bg-neutral-100 px-1">{address}</code>
+        <p className="text-sm text-slate-400">
+          Connected <code className={code}>{address}</code>
         </p>
       )}
 
-      <section className="mt-6 rounded border border-neutral-200 p-4 text-sm">
-        <h2 className="font-medium">Position</h2>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <p>Collateral ETH: {fmt(collateralRead.data as bigint | undefined)}</p>
-          <p>Debt USDT: {fmt(debtRead.data as bigint | undefined, usdtDecimals)}</p>
-          <p>
-            Health factor: <span className={hf.cls}>{hf.text}</span>
-          </p>
-          <p>Max borrow USDT: {fmt(maxBorrow, usdtDecimals)}</p>
-          <p>Collateral value: {fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)}</p>
-          <p>Debt value: {fmt(debtValueRead.data as bigint | undefined, usdtDecimals)}</p>
-          <p>Wallet USDT: {fmt(usdtWalletRead.data as bigint | undefined, usdtDecimals)}</p>
-          <p>Repay allowance: {fmt(usdtAllowanceRead.data as bigint | undefined, usdtDecimals)}</p>
+      <section className={`${card} mt-8`}>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-slate-100">Your position</h2>
+            {!hasPosition && isConnected ? (
+              <p className="mt-2 text-sm text-slate-500">No collateral or debt yet — deposit ETH to open a position.</p>
+            ) : null}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <StatTile label="Collateral (ETH)" value={fmt(collateralRead.data as bigint | undefined)} />
+              <StatTile label="Debt (USDT)" value={fmt(debtRead.data as bigint | undefined, usdtDecimals)} />
+              <StatTile label="Max borrow (USDT)" value={fmt(maxBorrow, usdtDecimals)} />
+              <StatTile label="Collateral value" value={fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)} />
+              <StatTile label="Debt value" value={fmt(debtValueRead.data as bigint | undefined, usdtDecimals)} />
+              <StatTile label="Wallet USDT" value={fmt(usdtWalletRead.data as bigint | undefined, usdtDecimals)} />
+            </div>
+          </div>
+          <div className="w-full shrink-0 lg:max-w-xs">
+            <p className={label}>Health factor</p>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${hf.textClass}`}>{hf.text}</p>
+            <div className="mt-4">
+              <HealthFactorBar hf={hfRead.data as bigint | undefined} />
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h3 className="font-medium">Deposit ETH collateral</h3>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            ETH amount
-            <input
-              value={collateralEth}
-              onChange={(e) => setCollateralEth(e.target.value)}
-              placeholder="0.5"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={!isConnected || !ready || !parsedCollateral || depositCollateralTx.isPending || depositReceipt.isLoading}
-            onClick={() =>
-              depositCollateralTx.writeContract({
-                abi: LendingPool_ABI,
-                address: lendingPoolAddress!,
-                functionName: "depositCollateral",
-                value: parsedCollateral!,
-              })
-            }
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
-            {depositCollateralTx.isPending || depositReceipt.isLoading ? "Depositing..." : "Deposit collateral"}
-          </button>
-        </div>
-      </section>
-
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h3 className="font-medium">Borrow USDT</h3>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            USDT amount
-            <input
-              value={borrowUsdt}
-              onChange={(e) => setBorrowUsdt(e.target.value)}
-              placeholder="100"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={!isConnected || !ready || !parsedBorrow || borrowTooHigh || borrowTx.isPending || borrowReceipt.isLoading}
-            onClick={() =>
-              borrowTx.writeContract({
-                abi: LendingPool_ABI,
-                address: lendingPoolAddress!,
-                functionName: "borrow",
-                args: [parsedBorrow!],
-              })
-            }
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
-            {borrowTx.isPending || borrowReceipt.isLoading ? "Borrowing..." : "Borrow"}
-          </button>
-        </div>
-        {borrowTooHigh ? <p className="mt-2 text-sm text-red-600">Borrow amount exceeds max borrow.</p> : null}
-      </section>
-
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h3 className="font-medium">Repay USDT</h3>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            USDT amount
-            <input
-              value={repayUsdt}
-              onChange={(e) => setRepayUsdt(e.target.value)}
-              placeholder="50"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-            />
-          </label>
-          {repayNeedsApprove ? (
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className={card}>
+          <h3 className="text-base font-semibold text-slate-100">Deposit ETH collateral</h3>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-sm text-slate-300">
+              <span className={label}>Amount (ETH)</span>
+              <input
+                value={collateralEth}
+                onChange={(e) => setCollateralEth(e.target.value)}
+                placeholder="0.5"
+                className={input}
+              />
+            </label>
             <button
               type="button"
-              disabled={!isConnected || !ready || !parsedRepay || approveTx.isPending || approveReceipt.isLoading}
-              onClick={() =>
-                approveTx.writeContract({
-                  abi: MockUSDT_ABI,
-                  address: usdtAddress!,
-                  functionName: "approve",
-                  args: [lendingPoolAddress!, parsedRepay!],
-                })
+              disabled={
+                !isConnected || !ready || !parsedCollateral || depositCollateralTx.isPending || depositReceipt.isLoading
               }
-              className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
-              {approveTx.isPending || approveReceipt.isLoading ? "Approving..." : "Approve USDT"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!isConnected || !ready || !parsedRepay || repayTx.isPending || repayReceipt.isLoading}
               onClick={() =>
-                repayTx.writeContract({
+                depositCollateralTx.writeContract({
                   abi: LendingPool_ABI,
                   address: lendingPoolAddress!,
-                  functionName: "repay",
-                  args: [parsedRepay!],
+                  functionName: "depositCollateral",
+                  value: parsedCollateral!,
                 })
               }
-              className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+              className={btnPrimary}
             >
-              {repayTx.isPending || repayReceipt.isLoading ? "Repaying..." : "Repay"}
+              {depositCollateralTx.isPending || depositReceipt.isLoading ? "Depositing…" : "Deposit"}
             </button>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h3 className="font-medium">Withdraw ETH collateral</h3>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            ETH amount
-            <input
-              value={withdrawEth}
-              onChange={(e) => setWithdrawEth(e.target.value)}
-              placeholder="0.1"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={!isConnected || !ready || !parsedWithdraw || withdrawTx.isPending || withdrawReceipt.isLoading}
-            onClick={() =>
-              withdrawTx.writeContract({
-                abi: LendingPool_ABI,
-                address: lendingPoolAddress!,
-                functionName: "withdrawCollateral",
-                args: [parsedWithdraw!],
-              })
-            }
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
-            {withdrawTx.isPending || withdrawReceipt.isLoading ? "Withdrawing..." : "Withdraw collateral"}
-          </button>
-        </div>
-      </section>
+        <section className={card}>
+          <h3 className="text-base font-semibold text-slate-100">Borrow USDT</h3>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-sm text-slate-300">
+              <span className={label}>Amount</span>
+              <input
+                value={borrowUsdt}
+                onChange={(e) => setBorrowUsdt(e.target.value)}
+                placeholder="100"
+                className={input}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={
+                !isConnected || !ready || !parsedBorrow || borrowTooHigh || borrowTx.isPending || borrowReceipt.isLoading
+              }
+              onClick={() =>
+                borrowTx.writeContract({
+                  abi: LendingPool_ABI,
+                  address: lendingPoolAddress!,
+                  functionName: "borrow",
+                  args: [parsedBorrow!],
+                })
+              }
+              className={btnPrimary}
+            >
+              {borrowTx.isPending || borrowReceipt.isLoading ? "Borrowing…" : "Borrow"}
+            </button>
+          </div>
+          {borrowTooHigh ? <p className="mt-2 text-sm text-red-400">Amount exceeds max borrow.</p> : null}
+        </section>
 
-      {depositCollateralTx.error ? <p className="mt-3 text-sm text-red-600">{depositCollateralTx.error.message}</p> : null}
-      {borrowTx.error ? <p className="mt-3 text-sm text-red-600">{borrowTx.error.message}</p> : null}
-      {approveTx.error ? <p className="mt-3 text-sm text-red-600">{approveTx.error.message}</p> : null}
-      {repayTx.error ? <p className="mt-3 text-sm text-red-600">{repayTx.error.message}</p> : null}
-      {withdrawTx.error ? <p className="mt-3 text-sm text-red-600">{withdrawTx.error.message}</p> : null}
+        <section className={card}>
+          <h3 className="text-base font-semibold text-slate-100">Repay USDT</h3>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-sm text-slate-300">
+              <span className={label}>Amount</span>
+              <input
+                value={repayUsdt}
+                onChange={(e) => setRepayUsdt(e.target.value)}
+                placeholder="50"
+                className={input}
+              />
+            </label>
+            {repayNeedsApprove ? (
+              <button
+                type="button"
+                disabled={!isConnected || !ready || !parsedRepay || approveTx.isPending || approveReceipt.isLoading}
+                onClick={() =>
+                  approveTx.writeContract({
+                    abi: MockUSDT_ABI,
+                    address: usdtAddress!,
+                    functionName: "approve",
+                    args: [lendingPoolAddress!, parsedRepay!],
+                  })
+                }
+                className={btnNeutral}
+              >
+                {approveTx.isPending || approveReceipt.isLoading ? "Approving…" : "Approve"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!isConnected || !ready || !parsedRepay || repayTx.isPending || repayReceipt.isLoading}
+                onClick={() =>
+                  repayTx.writeContract({
+                    abi: LendingPool_ABI,
+                    address: lendingPoolAddress!,
+                    functionName: "repay",
+                    args: [parsedRepay!],
+                  })
+                }
+                className={btnPrimary}
+              >
+                {repayTx.isPending || repayReceipt.isLoading ? "Repaying…" : "Repay"}
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className={card}>
+          <h3 className="text-base font-semibold text-slate-100">Withdraw ETH collateral</h3>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-sm text-slate-300">
+              <span className={label}>Amount (ETH)</span>
+              <input
+                value={withdrawEth}
+                onChange={(e) => setWithdrawEth(e.target.value)}
+                placeholder="0.1"
+                className={input}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={!isConnected || !ready || !parsedWithdraw || withdrawTx.isPending || withdrawReceipt.isLoading}
+              onClick={() =>
+                withdrawTx.writeContract({
+                  abi: LendingPool_ABI,
+                  address: lendingPoolAddress!,
+                  functionName: "withdrawCollateral",
+                  args: [parsedWithdraw!],
+                })
+              }
+              className={btnPrimary}
+            >
+              {withdrawTx.isPending || withdrawReceipt.isLoading ? "Withdrawing…" : "Withdraw"}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      {depositCollateralTx.error ? (
+        <p className="mt-4 text-sm text-red-400">{depositCollateralTx.error.message}</p>
+      ) : null}
+      {borrowTx.error ? <p className="mt-2 text-sm text-red-400">{borrowTx.error.message}</p> : null}
+      {approveTx.error ? <p className="mt-2 text-sm text-red-400">{approveTx.error.message}</p> : null}
+      {repayTx.error ? <p className="mt-2 text-sm text-red-400">{repayTx.error.message}</p> : null}
+      {withdrawTx.error ? <p className="mt-2 text-sm text-red-400">{withdrawTx.error.message}</p> : null}
 
       {!ready ? (
-        <p className="mt-6 text-sm text-red-600">
-          Missing or invalid contract env addresses. Set `NEXT_PUBLIC_LENDING_POOL_ADDRESS` and
-          `NEXT_PUBLIC_MOCK_USDT_ADDRESS`.
+        <p className="mt-8 text-sm text-red-400">
+          Set <code className={code}>NEXT_PUBLIC_LENDING_POOL_ADDRESS</code> and{" "}
+          <code className={code}>NEXT_PUBLIC_MOCK_USDT_ADDRESS</code>.
         </p>
       ) : null}
 
-      <div className="mt-8 flex gap-4 text-sm">
-        <Link href="/" className="text-blue-600 underline">
-          Home
+      <div className="mt-10 flex flex-wrap gap-4 text-sm">
+        <Link href="/pool" className="text-cyan-400/90 hover:text-cyan-300">
+          ← Pool
         </Link>
-        <Link href="/pool" className="text-blue-600 underline">
-          Pool
+        <Link href="/liquidations" className="text-cyan-400/90 hover:text-cyan-300">
+          Liquidations →
         </Link>
       </div>
     </main>

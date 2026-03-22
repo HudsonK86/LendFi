@@ -11,14 +11,17 @@ import {
   useWriteContract,
 } from "wagmi";
 
+import { PageHeader } from "@/components/PageHeader";
 import { LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { StatTile } from "@/components/StatTile";
+import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
-  if (value == null) return "-";
+  if (value == null) return "—";
   return Number(formatUnits(value, decimals)).toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
@@ -105,67 +108,76 @@ export function LiquidationsClient() {
 
   const ready = Boolean(isAddress(String(lendingPoolAddress)) && isAddress(String(usdtAddress)));
 
+  const hfNum = hf == null ? null : Number(formatUnits(hf, 18));
+
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="text-2xl font-semibold">Liquidations</h1>
-      <p className="mt-2 text-sm text-neutral-600">Liquidate borrower positions when health factor is below 1.</p>
+    <main className={shell}>
+      <PageHeader
+        title="Liquidations"
+        subtitle="Repay a borrower’s debt when their health factor is below 1 and receive collateral (+ liquidation incentive) per pool rules."
+      />
 
       {!mounted ? (
-        <p className="mt-6 text-sm text-neutral-500">Loading wallet...</p>
+        <p className="mt-6 text-sm text-slate-500">Loading wallet…</p>
       ) : !isConnected ? (
-        <div className="mt-6">
-          <WalletConnectButton />
+        <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950/50 p-8 text-center">
+          <p className="text-sm text-slate-400">Connect a wallet to liquidate positions.</p>
+          <div className="mt-4 flex justify-center">
+            <WalletConnectButton />
+          </div>
         </div>
       ) : (
-        <p className="mt-6 text-sm text-neutral-700">
-          Connected liquidator: <code className="rounded bg-neutral-100 px-1">{address}</code>
+        <p className="mt-6 text-sm text-slate-400">
+          Liquidator <code className={code}>{address}</code>
         </p>
       )}
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <label className="text-sm">
-          Borrower address
+      <section className={`${card} mt-8`}>
+        <label className="text-sm text-slate-300">
+          <span className={label}>Borrower address</span>
           <input
             value={borrower}
             onChange={(e) => setBorrower(e.target.value)}
-            placeholder="0x..."
-            className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+            placeholder="0x…"
+            className={input}
           />
         </label>
         {!borrowerAddress && borrower.trim() ? (
-          <p className="mt-2 text-sm text-red-600">Enter a valid EVM address.</p>
+          <p className="mt-2 text-sm text-red-400">Enter a valid EVM address.</p>
         ) : null}
       </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4 text-sm">
-        <h2 className="font-medium">Borrower status</h2>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <p>
-            Health factor:{" "}
-            <span className={hf != null && hf < 10n ** 18n ? "text-red-600" : "text-green-700"}>
-              {hf == null ? "-" : Number(formatUnits(hf, 18)).toFixed(3)}
-            </span>
-          </p>
-          <p>Debt USDT: {fmt(debtRead.data as bigint | undefined, usdtDecimals)}</p>
-          <p>Collateral ETH: {fmt(collateralRead.data as bigint | undefined, 18)}</p>
+      <section className={`${card} mt-6`}>
+        <h2 className="text-base font-semibold text-slate-100">Borrower status</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <StatTile
+            label="Health factor"
+            value={hfNum == null ? "—" : hfNum.toFixed(3)}
+            hint={hf != null && hf < 10n ** 18n ? "Below 1 — liquidatable" : "At or above 1"}
+          />
+          <StatTile label="Debt (USDT)" value={fmt(debtRead.data as bigint | undefined, usdtDecimals)} />
+          <StatTile label="Collateral (ETH)" value={fmt(collateralRead.data as bigint | undefined, 18)} />
         </div>
         {hf != null ? (
-          <p className="mt-2 text-sm">
-            {isLiquidatable ? "Position is liquidatable (HF < 1)." : "Not liquidatable (HF >= 1)."}
+          <p
+            className={`mt-4 text-sm font-medium ${isLiquidatable ? "text-red-400" : "text-emerald-400/90"}`}
+          >
+            {isLiquidatable ? "Position is liquidatable (HF < 1)." : "Not liquidatable (HF ≥ 1)."}
           </p>
         ) : null}
       </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h2 className="font-medium">Liquidate</h2>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm">
-            Repay amount (USDT)
+      <section className={`${card} mt-6`}>
+        <h2 className="text-base font-semibold text-slate-100">Liquidate</h2>
+        <p className="mt-1 text-xs text-slate-500">Approve USDT if needed, then call liquidate.</p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex-1 text-sm text-slate-300">
+            <span className={label}>Repay amount (USDT)</span>
             <input
               value={repayAmount}
               onChange={(e) => setRepayAmount(e.target.value)}
               placeholder="50"
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
+              className={input}
             />
           </label>
           {needsApprove ? (
@@ -180,9 +192,9 @@ export function LiquidationsClient() {
                   args: [lendingPoolAddress!, parsedRepay!],
                 })
               }
-              className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+              className={btnNeutral}
             >
-              {approveTx.isPending || approveReceipt.isLoading ? "Approving..." : "Approve USDT"}
+              {approveTx.isPending || approveReceipt.isLoading ? "Approving…" : "Approve USDT"}
             </button>
           ) : (
             <button
@@ -204,29 +216,30 @@ export function LiquidationsClient() {
                   args: [borrowerAddress!, parsedRepay!],
                 })
               }
-              className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+              className={btnPrimary}
             >
-              {liquidateTx.isPending || liquidateReceipt.isLoading ? "Liquidating..." : "Liquidate"}
+              {liquidateTx.isPending || liquidateReceipt.isLoading ? "Liquidating…" : "Liquidate"}
             </button>
           )}
         </div>
       </section>
 
-      {approveTx.error ? <p className="mt-3 text-sm text-red-600">{approveTx.error.message}</p> : null}
-      {liquidateTx.error ? <p className="mt-3 text-sm text-red-600">{liquidateTx.error.message}</p> : null}
+      {approveTx.error ? <p className="mt-3 text-sm text-red-400">{approveTx.error.message}</p> : null}
+      {liquidateTx.error ? <p className="mt-3 text-sm text-red-400">{liquidateTx.error.message}</p> : null}
 
       {!ready ? (
-        <p className="mt-6 text-sm text-red-600">
-          Missing or invalid env addresses for `NEXT_PUBLIC_LENDING_POOL_ADDRESS` and `NEXT_PUBLIC_MOCK_USDT_ADDRESS`.
+        <p className="mt-8 text-sm text-red-400">
+          Set <code className={code}>NEXT_PUBLIC_LENDING_POOL_ADDRESS</code> and{" "}
+          <code className={code}>NEXT_PUBLIC_MOCK_USDT_ADDRESS</code>.
         </p>
       ) : null}
 
-      <div className="mt-8 flex gap-4 text-sm">
-        <Link href="/" className="text-blue-600 underline">
-          Home
+      <div className="mt-10 flex flex-wrap gap-4 text-sm">
+        <Link href="/borrow" className="text-cyan-400/90 hover:text-cyan-300">
+          ← Borrow
         </Link>
-        <Link href="/borrow" className="text-blue-600 underline">
-          Borrow
+        <Link href="/dashboard" className="text-cyan-400/90 hover:text-cyan-300">
+          Dashboard →
         </Link>
       </div>
     </main>
