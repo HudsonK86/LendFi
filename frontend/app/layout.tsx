@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "LendFi",
-  description: "Shared-pool lending demo — supply liquidity, borrow with ETH collateral, monitor risk.",
+  description: "Shared-pool lending — supply liquidity, borrow with ETH collateral, monitor risk.",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
             <AppHeader />
             <div className="flex-1">{children}</div>
             <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
-              LendFi · MVP lending interface · Local dev only
+              LendFi · Shared-pool lending protocol
             </footer>
           </div>
         </Providers>

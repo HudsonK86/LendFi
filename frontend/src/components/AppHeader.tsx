@@ -2,50 +2,47 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAccount, useChainId } from "wagmi";
+import { useMemo } from "react";
+import { isAddress } from "viem";
+import { useAccount } from "wagmi";
 
-import { WalletBalance } from "@/components/WalletBalance";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { cn } from "@/lib/ui";
 
-const nav = [
+const configuredAdminWallet = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS as string | undefined;
+
+const baseNav = [
   { href: "/", label: "Home" },
+  { href: "/protocol", label: "Protocol" },
   { href: "/pool", label: "Pool" },
   { href: "/borrow", label: "Borrow" },
-  { href: "/dashboard", label: "Dashboard" },
   { href: "/liquidations", label: "Liquidations" },
-  { href: "/admin", label: "Admin" },
+  { href: "/dashboard", label: "Dashboard" },
 ] as const;
 
-function NetworkBadge() {
-  const chainId = useChainId();
-  const { isConnected } = useAccount();
+const adminNavItem = { href: "/admin", label: "Admin" } as const;
 
-  const label =
-    chainId === 31337
-      ? "Hardhat Local"
-      : chainId === 1
-        ? "Ethereum"
-        : `Chain ${chainId}`;
+/** Show Admin in the nav only when the connected wallet matches the configured admin address. */
+function useShowAdminInNav() {
+  const { address, isConnected } = useAccount();
 
-  return (
-    <span
-      className={cn(
-        "hidden items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-medium sm:inline-flex",
-        isConnected
-          ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
-          : "border-slate-600/80 bg-slate-800/60 text-slate-400",
-      )}
-      title="Connected network"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" aria-hidden />
-      {label}
-    </span>
-  );
+  return useMemo(() => {
+    if (!configuredAdminWallet || !isAddress(configuredAdminWallet)) {
+      // No admin address in env — keep link visible so local setups without env still work.
+      return true;
+    }
+    return Boolean(isConnected && address?.toLowerCase() === configuredAdminWallet.toLowerCase());
+  }, [address, isConnected]);
 }
 
 export function AppHeader() {
   const pathname = usePathname();
+  const showAdminInNav = useShowAdminInNav();
+
+  const nav = useMemo(
+    () => (showAdminInNav ? [...baseNav, adminNavItem] : [...baseNav]),
+    [showAdminInNav],
+  );
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -81,9 +78,7 @@ export function AppHeader() {
             ))}
           </nav>
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <NetworkBadge />
-          <WalletBalance />
+        <div className="flex shrink-0 items-center">
           <WalletConnectButton />
         </div>
       </div>

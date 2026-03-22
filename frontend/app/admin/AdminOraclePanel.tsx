@@ -88,7 +88,7 @@ export function AdminOraclePanel() {
     <section className="mt-8 rounded-xl border border-amber-500/25 bg-amber-950/20 p-6 shadow-lg shadow-amber-950/20 backdrop-blur-sm">
       <h2 className="text-lg font-semibold text-amber-100">Oracle</h2>
       <p className="mt-1 text-sm text-amber-200/70">
-        Sets <code className={code}>MockPriceOracle.setPrice(uint256)</code> — price is <strong>USDT per 1 ETH</strong> with{" "}
+        Calls <code className={code}>setPrice(uint256)</code> on the price oracle — price is <strong>USDT per 1 ETH</strong> with{" "}
         <strong>18 decimals</strong> (same as pool math).
       </p>
 

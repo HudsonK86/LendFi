@@ -175,7 +175,7 @@ export function PoolClient() {
     <main className={shell}>
       <PageHeader
         title="Pool"
-        subtitle="Supply MockUSDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
+        subtitle="Supply USDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
       />
 
       <div className={card}>
@@ -185,7 +185,7 @@ export function PoolClient() {
             LendingPool <code className={code}>{lendingPoolAddress || "missing env"}</code>
           </p>
           <p>
-            MockUSDT <code className={code}>{usdtAddress || "missing env"}</code>
+            USDT <code className={code}>{usdtAddress || "missing env"}</code>
           </p>
           <p>
             FRToken <code className={code}>{frTokenAddress || "missing env"}</code>
@@ -202,11 +202,7 @@ export function PoolClient() {
             <WalletConnectButton />
           </div>
         </div>
-      ) : (
-        <p className="mt-6 text-sm text-slate-400">
-          Connected <code className={code}>{address}</code>
-        </p>
-      )}
+      ) : null}
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market</h2>
@@ -226,7 +222,7 @@ export function PoolClient() {
             <tbody>
               <tr className="border-b border-slate-800/80 bg-slate-900/20">
                 <td className={td}>
-                  <span className="font-medium text-slate-100">MockUSDT</span>
+                  <span className="font-medium text-slate-100">USDT</span>
                   <span className="ml-2 text-xs text-slate-500">→ FR</span>
                 </td>
                 <td className={`${td} tabular-nums`}>{fmtToken(totalSupplied.data as bigint | undefined)}</td>

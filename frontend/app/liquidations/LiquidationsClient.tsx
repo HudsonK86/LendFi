@@ -126,11 +126,7 @@ export function LiquidationsClient() {
             <WalletConnectButton />
           </div>
         </div>
-      ) : (
-        <p className="mt-6 text-sm text-slate-400">
-          Liquidator <code className={code}>{address}</code>
-        </p>
-      )}
+      ) : null}
 
       <section className={`${card} mt-8`}>
         <label className="text-sm text-slate-300">

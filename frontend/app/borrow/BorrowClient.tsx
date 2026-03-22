@@ -216,7 +216,7 @@ export function BorrowClient() {
     <main className={shell}>
       <PageHeader
         title="Borrow"
-        subtitle="Deposit ETH collateral, borrow MockUSDT against it, and keep health factor above 1 to avoid liquidation."
+        subtitle="Deposit ETH collateral, borrow USDT against it, and keep health factor above 1 to avoid liquidation."
       />
 
       {!mounted ? (
@@ -228,11 +228,7 @@ export function BorrowClient() {
             <WalletConnectButton />
           </div>
         </div>
-      ) : (
-        <p className="text-sm text-slate-400">
-          Connected <code className={code}>{address}</code>
-        </p>
-      )}
+      ) : null}
 
       <section className={`${card} mt-8`}>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
