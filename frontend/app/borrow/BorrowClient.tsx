@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { formatUnits, isAddress, parseEther, parseUnits } from "viem";
 import {
@@ -60,6 +61,12 @@ export function BorrowClient() {
   const [borrowUsdt, setBorrowUsdt] = useState("");
   const [repayUsdt, setRepayUsdt] = useState("");
   const [withdrawEth, setWithdrawEth] = useState("");
+  const queryClient = useQueryClient();
+  const processedDepositHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedBorrowHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedApproveHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedRepayHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedWithdrawHash = useRef<`0x${string}` | undefined>(undefined);
 
   const { address, isConnected } = useAccount();
 
@@ -141,21 +148,55 @@ export function BorrowClient() {
   const approveReceipt = useWaitForTransactionReceipt({ hash: approveTx.data });
   const repayReceipt = useWaitForTransactionReceipt({ hash: repayTx.data });
   const withdrawReceipt = useWaitForTransactionReceipt({ hash: withdrawTx.data });
+
   useEffect(() => {
-    if (depositReceipt.isSuccess) toast.success("Collateral deposited");
-  }, [depositReceipt.isSuccess]);
+    const hash = depositCollateralTx.data;
+    if (!depositReceipt.isSuccess || !hash) return;
+    if (processedDepositHash.current === hash) return;
+    processedDepositHash.current = hash;
+    toast.success("Collateral deposited");
+    setCollateralEth("");
+    void queryClient.invalidateQueries();
+  }, [depositReceipt.isSuccess, depositCollateralTx.data, queryClient]);
+
   useEffect(() => {
-    if (borrowReceipt.isSuccess) toast.success("Borrow confirmed");
-  }, [borrowReceipt.isSuccess]);
+    const hash = borrowTx.data;
+    if (!borrowReceipt.isSuccess || !hash) return;
+    if (processedBorrowHash.current === hash) return;
+    processedBorrowHash.current = hash;
+    toast.success("Borrow confirmed");
+    setBorrowUsdt("");
+    void queryClient.invalidateQueries();
+  }, [borrowReceipt.isSuccess, borrowTx.data, queryClient]);
+
   useEffect(() => {
-    if (approveReceipt.isSuccess) toast.success("USDT approval confirmed");
-  }, [approveReceipt.isSuccess]);
+    const hash = approveTx.data;
+    if (!approveReceipt.isSuccess || !hash) return;
+    if (processedApproveHash.current === hash) return;
+    processedApproveHash.current = hash;
+    toast.success("USDT approval confirmed");
+    void queryClient.invalidateQueries();
+  }, [approveReceipt.isSuccess, approveTx.data, queryClient]);
+
   useEffect(() => {
-    if (repayReceipt.isSuccess) toast.success("Repay confirmed");
-  }, [repayReceipt.isSuccess]);
+    const hash = repayTx.data;
+    if (!repayReceipt.isSuccess || !hash) return;
+    if (processedRepayHash.current === hash) return;
+    processedRepayHash.current = hash;
+    toast.success("Repay confirmed");
+    setRepayUsdt("");
+    void queryClient.invalidateQueries();
+  }, [repayReceipt.isSuccess, repayTx.data, queryClient]);
+
   useEffect(() => {
-    if (withdrawReceipt.isSuccess) toast.success("Collateral withdraw confirmed");
-  }, [withdrawReceipt.isSuccess]);
+    const hash = withdrawTx.data;
+    if (!withdrawReceipt.isSuccess || !hash) return;
+    if (processedWithdrawHash.current === hash) return;
+    processedWithdrawHash.current = hash;
+    toast.success("Collateral withdraw confirmed");
+    setWithdrawEth("");
+    void queryClient.invalidateQueries();
+  }, [withdrawReceipt.isSuccess, withdrawTx.data, queryClient]);
   useEffect(() => {
     if (depositCollateralTx.error) toast.error(depositCollateralTx.error.message);
   }, [depositCollateralTx.error]);

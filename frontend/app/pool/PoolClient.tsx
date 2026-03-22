@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import {
@@ -58,6 +59,10 @@ export function PoolClient() {
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawFrAmount, setWithdrawFrAmount] = useState("");
   const [mounted, setMounted] = useState(false);
+  const queryClient = useQueryClient();
+  const processedApproveHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedDepositHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedWithdrawHash = useRef<`0x${string}` | undefined>(undefined);
 
   const { address, isConnected } = useAccount();
 
@@ -263,15 +268,32 @@ export function PoolClient() {
   const approveReceipt = useWaitForTransactionReceipt({ hash: approveHash });
   const depositReceipt = useWaitForTransactionReceipt({ hash: depositHash });
   const withdrawReceipt = useWaitForTransactionReceipt({ hash: withdrawHash });
+
   useEffect(() => {
-    if (approveReceipt.isSuccess) toast.success("USDT approval confirmed");
-  }, [approveReceipt.isSuccess]);
+    if (!approveReceipt.isSuccess || !approveHash) return;
+    if (processedApproveHash.current === approveHash) return;
+    processedApproveHash.current = approveHash;
+    toast.success("USDT approval confirmed");
+    void queryClient.invalidateQueries();
+  }, [approveReceipt.isSuccess, approveHash, queryClient]);
+
   useEffect(() => {
-    if (depositReceipt.isSuccess) toast.success("Deposit confirmed");
-  }, [depositReceipt.isSuccess]);
+    if (!depositReceipt.isSuccess || !depositHash) return;
+    if (processedDepositHash.current === depositHash) return;
+    processedDepositHash.current = depositHash;
+    toast.success("Deposit confirmed");
+    setDepositAmount("");
+    void queryClient.invalidateQueries();
+  }, [depositReceipt.isSuccess, depositHash, queryClient]);
+
   useEffect(() => {
-    if (withdrawReceipt.isSuccess) toast.success("Withdraw confirmed");
-  }, [withdrawReceipt.isSuccess]);
+    if (!withdrawReceipt.isSuccess || !withdrawHash) return;
+    if (processedWithdrawHash.current === withdrawHash) return;
+    processedWithdrawHash.current = withdrawHash;
+    toast.success("Withdraw confirmed");
+    setWithdrawFrAmount("");
+    void queryClient.invalidateQueries();
+  }, [withdrawReceipt.isSuccess, withdrawHash, queryClient]);
   useEffect(() => {
     if (approveError) toast.error(approveError.message);
   }, [approveError]);

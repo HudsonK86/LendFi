@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { isAddress, parseUnits } from "viem";
 import {
@@ -33,6 +34,9 @@ type LiquidationPanelProps = {
 
 export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
   const [repayAmount, setRepayAmount] = useState("");
+  const queryClient = useQueryClient();
+  const processedApproveHash = useRef<`0x${string}` | undefined>(undefined);
+  const processedLiquidateHash = useRef<`0x${string}` | undefined>(undefined);
 
   const { address, isConnected } = useAccount();
 
@@ -132,16 +136,26 @@ export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
   const liquidateTx = useWriteContract();
   const approveReceipt = useWaitForTransactionReceipt({ hash: approveTx.data });
   const liquidateReceipt = useWaitForTransactionReceipt({ hash: liquidateTx.data });
+
   useEffect(() => {
-    if (approveReceipt.isSuccess) toast.success("USDT approval confirmed");
-  }, [approveReceipt.isSuccess]);
-  const refetchScanLiquidations = scanRead.refetch;
+    const hash = approveTx.data;
+    if (!approveReceipt.isSuccess || !hash) return;
+    if (processedApproveHash.current === hash) return;
+    processedApproveHash.current = hash;
+    toast.success("USDT approval confirmed");
+    void queryClient.invalidateQueries();
+  }, [approveReceipt.isSuccess, approveTx.data, queryClient]);
+
   useEffect(() => {
-    if (liquidateReceipt.isSuccess) {
-      toast.success("Liquidation confirmed");
-      void refetchScanLiquidations();
-    }
-  }, [liquidateReceipt.isSuccess, refetchScanLiquidations]);
+    const hash = liquidateTx.data;
+    if (!liquidateReceipt.isSuccess || !hash) return;
+    if (processedLiquidateHash.current === hash) return;
+    processedLiquidateHash.current = hash;
+    toast.success("Liquidation confirmed");
+    setRepayAmount("");
+    void scanRead.refetch();
+    void queryClient.invalidateQueries();
+  }, [liquidateReceipt.isSuccess, liquidateTx.data, queryClient, scanRead]);
   useEffect(() => {
     if (approveTx.error) toast.error(approveTx.error.message);
   }, [approveTx.error]);
