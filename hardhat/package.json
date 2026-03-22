@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "mint:usdt": "node --import tsx/esm ./scripts/mint-mock-usdt.ts --network localhost"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +18,7 @@
     "@vitest/ui": "^4.1.0",
     "chai": "^6.2.2",
     "hardhat": "^3.1.11",
+    "tsx": "^4.19.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   }
