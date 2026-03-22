@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { formatUnits, isAddress, parseEther, parseUnits } from "viem";
 import {
   useAccount,
+  useBalance,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -23,7 +24,12 @@ const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` |
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
-  return Number(formatUnits(value, decimals)).toLocaleString(undefined, { maximumFractionDigits: digits });
+  return Number(formatUnits(value, decimals)).toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function fmtWalletNativeEth(data?: { value: bigint; decimals: number }) {
+  if (!data) return "—";
+  return `${Number(formatUnits(data.value, data.decimals)).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`;
 }
 
 function hfLabel(hf?: bigint) {
@@ -69,6 +75,10 @@ export function BorrowClient() {
   const processedWithdrawHash = useRef<`0x${string}` | undefined>(undefined);
 
   const { address, isConnected } = useAccount();
+  const { data: walletEthBalance } = useBalance({
+    address,
+    query: { enabled: Boolean(address) },
+  });
 
   useEffect(() => setMounted(true), []);
 
@@ -280,10 +290,14 @@ export function BorrowClient() {
             ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <StatTile label="Collateral (ETH)" value={fmt(collateralRead.data as bigint | undefined)} />
-              <StatTile label="Debt (USDT)" value={fmt(debtRead.data as bigint | undefined, usdtDecimals)} />
+              <StatTile
+                label="Debt (USDT)"
+                value={fmt(debtValueRead.data as bigint | undefined, usdtDecimals)}
+                hint="Includes accrued interest"
+              />
               <StatTile label="Max borrow (USDT)" value={fmt(maxBorrow, usdtDecimals)} />
               <StatTile label="Collateral value (USDT)" value={fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)} />
-              <StatTile label="Debt value" value={fmt(debtValueRead.data as bigint | undefined, usdtDecimals)} />
+              <StatTile label="Wallet ETH" value={fmtWalletNativeEth(walletEthBalance)} />
               <StatTile label="Wallet USDT" value={fmt(usdtWalletRead.data as bigint | undefined, usdtDecimals)} />
             </div>
           </div>

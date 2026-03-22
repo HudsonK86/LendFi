@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import {
   useAccount,
+  useBalance,
   useReadContract,
   useReadContracts,
   useWaitForTransactionReceipt,
@@ -47,6 +48,11 @@ function fmtEthWei(wei?: bigint, digits = 6) {
   return `${Number(formatUnits(wei, 18)).toLocaleString("en-US", { maximumFractionDigits: digits })} ETH`;
 }
 
+function fmtWalletNativeEth(data?: { value: bigint; decimals: number }) {
+  if (!data) return "—";
+  return `${Number(formatUnits(data.value, data.decimals)).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`;
+}
+
 type MulticallRow = { status: "success" | "failure"; result?: unknown };
 
 function asBigint(row: MulticallRow | undefined): bigint | undefined {
@@ -65,6 +71,10 @@ export function PoolClient() {
   const processedWithdrawHash = useRef<`0x${string}` | undefined>(undefined);
 
   const { address, isConnected } = useAccount();
+  const { data: walletEthBalance } = useBalance({
+    address,
+    query: { enabled: Boolean(address) },
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -429,6 +439,12 @@ export function PoolClient() {
               <span className="text-slate-500">Wallet USDT</span>
               <span className="tabular-nums font-medium text-slate-100">
                 {fmtToken(usdtBalance.data as bigint | undefined)}
+              </span>
+            </div>
+            <div className="flex justify-between border-b border-slate-800/80 py-2">
+              <span className="text-slate-500">Wallet ETH</span>
+              <span className="tabular-nums font-medium text-slate-100">
+                {fmtWalletNativeEth(walletEthBalance)}
               </span>
             </div>
             <div className="flex justify-between border-b border-slate-800/80 py-2">
