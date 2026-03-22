@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-3d170b5561c30b7265e4654c6b94ae8b24beffb1",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/FRToken.sol": "project/contracts/FRToken.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/FRToken.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\n/**\n * @notice Step-0 placeholder for the FR pool share token.\n * Real mint/burn restrictions and accounting logic are implemented in Step 2.\n */\ncontract FRToken {\n    string public name = \"FRToken\";\n    string public symbol = \"FR\";\n    uint8 public decimals = 18;\n\n    uint256 public totalSupply;\n\n    mapping(address => uint256) private balances;\n    mapping(address => mapping(address => uint256)) private allowances;\n\n    address public owner;\n    address public lendingPool;\n\n    event Transfer(address indexed from, address indexed to, uint256 value);\n    event Approval(address indexed owner, address indexed spender, uint256 value);\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"NOT_OWNER\");\n        _;\n    }\n\n    modifier onlyLendingPool() {\n        require(msg.sender == lendingPool, \"NOT_LENDING_POOL\");\n        _;\n    }\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    function balanceOf(address account) external view returns (uint256) {\n        return balances[account];\n    }\n\n    function allowance(address owner_, address spender) external view returns (uint256) {\n        return allowances[owner_][spender];\n    }\n\n    function approve(address spender, uint256 amount) external returns (bool) {\n        allowances[msg.sender][spender] = amount;\n        emit Approval(msg.sender, spender, amount);\n        return true;\n    }\n\n    function transfer(address to, uint256 amount) external returns (bool) {\n        _transfer(msg.sender, to, amount);\n        return true;\n    }\n\n    function transferFrom(address from, address to, uint256 amount) external returns (bool) {\n        uint256 currentAllowance = allowances[from][msg.sender];\n        require(currentAllowance >= amount, \"ALLOWANCE\");\n        allowances[from][msg.sender] = currentAllowance - amount;\n        _transfer(from, to, amount);\n        return true;\n    }\n\n    /**\n     * @notice Step-0 placeholder setter. Real restrictions are refined in Step 2.\n     */\n    function setLendingPool(address pool) external onlyOwner {\n        lendingPool = pool;\n    }\n\n    function mint(address to, uint256 amount) external onlyLendingPool {\n        balances[to] += amount;\n        totalSupply += amount;\n        emit Transfer(address(0), to, amount);\n    }\n\n    function burn(address from, uint256 amount) external onlyLendingPool {\n        uint256 fromBal = balances[from];\n        require(fromBal >= amount, \"BALANCE\");\n        balances[from] = fromBal - amount;\n        totalSupply -= amount;\n        emit Transfer(from, address(0), amount);\n    }\n\n    function _transfer(address from, address to, uint256 amount) internal {\n        require(to != address(0), \"ZERO_TO\");\n        uint256 fromBal = balances[from];\n        require(fromBal >= amount, \"BALANCE\");\n\n        balances[from] = fromBal - amount;\n        balances[to] += amount;\n        emit Transfer(from, to, amount);\n    }\n}\n\n"
+      }
+    }
+  }
+}

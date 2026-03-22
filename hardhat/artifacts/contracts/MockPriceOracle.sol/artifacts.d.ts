@@ -15,7 +15,7 @@ export interface MockPriceOracle$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/MockPriceOracle.sol";
-  readonly buildInfoId: "solc-0_8_28-5975ac55bd949c0aae47bf6367aa94078e0764c3";
+  readonly buildInfoId: "solc-0_8_28-a3b1ebecce5674f11833f79cb86e55d07fbed737";
 };
 
 import "hardhat/types/artifacts";

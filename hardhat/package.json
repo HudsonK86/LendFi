@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy": "hardhat ignition deploy ignition/modules/LendingPool.ts --network localhost && npm run mint:usdt",
     "mint:usdt": "node --import tsx/esm ./scripts/mint-mock-usdt.ts --network localhost"
   },
   "keywords": [],
