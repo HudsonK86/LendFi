@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
+import { getAdminSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import type { AdminActionLog } from "@/lib/types";
 
@@ -10,7 +11,20 @@ type ActionCountRow = {
   count: string;
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const res = NextResponse.json({});
+  let session;
+  try {
+    session = await getAdminSession(request, res);
+  } catch (e) {
+    console.error("admin analytics session error", e);
+    return NextResponse.json({ error: "Server is not configured for sessions" }, { status: 500 });
+  }
+
+  if (!session.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const recent = await query<AdminActionLog>(
       `
@@ -32,14 +46,13 @@ export async function GET() {
     return NextResponse.json({
       recentActions: recent.rows,
       actionCounts: actionCounts.rows.map((r) => ({ action: r.action, count: Number(r.count) })),
-      // Placeholders until snapshot/liquidation tables are added in later steps.
       liquidationRecords: [],
       apySnapshots: [],
       utilizationSnapshots: [],
       notes: "Off-chain analytics are DB-backed support data; on-chain is source of truth.",
     });
   } catch (error) {
-    console.error("dashboard analytics error", error);
+    console.error("admin analytics error", error);
     return NextResponse.json(
       { error: "Failed to load analytics. Check DATABASE_URL and DB schema." },
       { status: 500 },

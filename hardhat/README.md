@@ -42,3 +42,11 @@ Notes:
 
 - `MockUSDT.demoMint` is **`onlyOwner`**, so the script uses account `#0` as the minter by default (`--deployer-index`).
 - Restarting `hardhat node` / redeploying resets chain state — rerun deploy + mint as needed.
+
+## Liquidations page (frontend)
+
+The pool stores debt per address but does not expose “all borrowers” on-chain. The app discovers
+liquidatable positions by multicalling `getHealthFactor` / `debt` / `collateral` over a configured
+candidate address list (defaults + optional `NEXT_PUBLIC_LIQUIDATION_CANDIDATES` in the frontend).
+It then targets the **lowest health factor** among underwater loans in that set. For a production
+deployment you would add a borrower registry and/or an indexer.

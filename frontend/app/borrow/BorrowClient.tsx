@@ -420,8 +420,8 @@ export function BorrowClient() {
         <Link href="/pool" className="text-cyan-400/90 hover:text-cyan-300">
           ← Pool
         </Link>
-        <Link href="/liquidations" className="text-cyan-400/90 hover:text-cyan-300">
-          Liquidations →
+        <Link href="/dashboard" className="text-cyan-400/90 hover:text-cyan-300">
+          Dashboard →
         </Link>
       </div>
     </main>

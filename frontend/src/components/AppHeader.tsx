@@ -16,7 +16,6 @@ const baseNav = [
   { href: "/protocol", label: "Protocol" },
   { href: "/pool", label: "Pool" },
   { href: "/borrow", label: "Borrow" },
-  { href: "/liquidations", label: "Liquidations" },
   { href: "/dashboard", label: "Dashboard" },
 ] as const;
 

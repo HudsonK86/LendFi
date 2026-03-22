@@ -1,6 +1,13 @@
 import { isAddress } from "viem";
 
 /**
+ * Liquidation UI discovers underwater loans by reading HF/debt/collateral for a **fixed set of
+ * addresses** (multicall). The pool contract has no on-chain iterable list of all borrowers; a
+ * production app would use a borrower registry in the contract and/or an off-chain indexer
+ * (subgraph, DB from events). This approach is sufficient for local Hardhat demos and school projects.
+ */
+
+/**
  * First 20 accounts from Hardhat’s default mnemonic (`test test test ... junk`).
  * Use these for local liquidation discovery when no custom list is set.
  */

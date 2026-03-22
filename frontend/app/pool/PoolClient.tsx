@@ -12,6 +12,7 @@ import {
 } from "wagmi";
 
 import { PageHeader } from "@/components/PageHeader";
+import { LiquidationPanel } from "@/components/LiquidationPanel";
 import { FRToken_ABI, LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { btnNeutral, btnPrimary, card, code, input, label, shell, tableWrap, td, th } from "@/lib/ui";
@@ -348,6 +349,10 @@ export function PoolClient() {
         </div>
         {withdrawError ? <p className="mt-2 text-sm text-red-400">{withdrawError.message}</p> : null}
       </section>
+
+      {isConnected ? (
+        <LiquidationPanel className={`${card} mt-6`} showAllowanceHint />
+      ) : null}
 
       {!ready ? (
         <p className="mt-8 text-sm text-red-400">

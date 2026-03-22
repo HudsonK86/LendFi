@@ -7,22 +7,11 @@ import { useAccount, useReadContract } from "wagmi";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI } from "@/lib/abi";
-import type { AdminActionLog } from "@/lib/types";
 import { card, code, input, label, shell, tableWrap, td, th } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtOracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as `0x${string}` | undefined;
 const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` | undefined;
-
-type AnalyticsResponse = {
-  recentActions: AdminActionLog[];
-  actionCounts: Array<{ action: string; count: number }>;
-  liquidationRecords: unknown[];
-  apySnapshots: unknown[];
-  utilizationSnapshots: unknown[];
-  notes: string;
-  error?: string;
-};
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
@@ -38,37 +27,10 @@ export function DashboardClient() {
   const [mounted, setMounted] = useState(false);
   const [borrowerAddressInput, setBorrowerAddressInput] = useState("");
   const [lenderAddressInput, setLenderAddressInput] = useState("");
-  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
-  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
   const { address } = useAccount();
 
   useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    let active = true;
-    async function loadAnalytics() {
-      try {
-        const res = await fetch("/api/dashboard/analytics");
-        const data = (await res.json()) as AnalyticsResponse;
-        if (!active) return;
-        if (!res.ok) {
-          setAnalyticsError(data.error ?? "Failed to load analytics");
-          return;
-        }
-        setAnalytics(data);
-        setAnalyticsError(null);
-      } catch {
-        if (active) setAnalyticsError("Failed to load analytics");
-      }
-    }
-    void loadAnalytics();
-    const id = setInterval(() => void loadAnalytics(), 5000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
 
   const borrowerAddress = useMemo(
     () => (isAddress(borrowerAddressInput.trim()) ? (borrowerAddressInput.trim() as `0x${string}`) : undefined),
@@ -193,10 +155,7 @@ export function DashboardClient() {
 
   return (
     <main className={shell}>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Protocol metrics from the chain, plus optional PostgreSQL history for admin analytics."
-      />
+      <PageHeader title="Dashboard" subtitle="Protocol metrics and position views from the chain." />
 
       {!canRender ? (
         <p className="mt-4 text-sm text-red-400">
@@ -291,47 +250,6 @@ export function DashboardClient() {
           </section>
         </>
       )}
-
-      <section className={`${card} mt-8`}>
-        <h2 className="text-base font-semibold text-slate-100">Historical analytics</h2>
-        <p className="mt-1 text-xs text-slate-500">PostgreSQL — admin action logs & placeholders.</p>
-        {analyticsError ? <p className="mt-3 text-sm text-red-400">{analyticsError}</p> : null}
-        {!analytics ? (
-          <p className="mt-4 text-sm text-slate-500">Loading…</p>
-        ) : (
-          <>
-            <p className="mt-3 text-sm text-slate-400">{analytics.notes}</p>
-            <div className="mt-6 grid gap-6 lg:grid-cols-2">
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Action counts</h3>
-                <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                  {analytics.actionCounts.length === 0 ? <li className="text-slate-500">No actions logged yet.</li> : null}
-                  {analytics.actionCounts.map((a) => (
-                    <li key={a.action} className="flex justify-between border-b border-slate-800/60 py-1">
-                      <span>{a.action}</span>
-                      <span className="tabular-nums text-slate-400">{a.count}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent actions</h3>
-                <ul className="mt-3 max-h-56 space-y-2 overflow-auto text-xs text-slate-400">
-                  {analytics.recentActions.length === 0 ? <li>No recent actions.</li> : null}
-                  {analytics.recentActions.map((r) => (
-                    <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
-                      {r.created_at} · {r.username} · {r.action}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-slate-600">
-              Liquidation records / APY snapshots are placeholders until dedicated tables exist.
-            </p>
-          </>
-        )}
-      </section>
     </main>
   );
 }

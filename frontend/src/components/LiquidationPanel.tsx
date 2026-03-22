@@ -1,0 +1,249 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
+import { isAddress, parseUnits } from "viem";
+import {
+  useAccount,
+  useReadContract,
+  useReadContracts,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
+
+import { LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { getLiquidationScanAddresses } from "@/lib/liquidation-scan-addresses";
+import { btnNeutral, btnPrimary, card, input, label } from "@/lib/ui";
+
+const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
+const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
+
+type MulticallRow = { status: "success" | "failure"; result?: unknown };
+
+function asBigint(row: MulticallRow | undefined): bigint | undefined {
+  if (!row || row.status !== "success") return undefined;
+  const r = row.result;
+  return typeof r === "bigint" ? r : undefined;
+}
+
+type LiquidationPanelProps = {
+  /** Extra class for the outer section (default: card shell) */
+  className?: string;
+  /** Show intro line about shared allowance with supply */
+  showAllowanceHint?: boolean;
+};
+
+export function LiquidationPanel({ className = card, showAllowanceHint = false }: LiquidationPanelProps) {
+  const [repayAmount, setRepayAmount] = useState("");
+
+  const { address, isConnected } = useAccount();
+
+  const scanAddresses = useMemo(() => getLiquidationScanAddresses(), []);
+
+  const usdtDecimalsRead = useReadContract({
+    abi: MockUSDT_ABI,
+    address: usdtAddress,
+    functionName: "decimals",
+    query: { enabled: Boolean(usdtAddress) },
+  });
+  const usdtDecimals = Number(usdtDecimalsRead.data ?? 18);
+
+  const scanContracts = useMemo(
+    () =>
+      lendingPoolAddress
+        ? scanAddresses.flatMap((addr) => [
+            {
+              address: lendingPoolAddress,
+              abi: LendingPool_ABI,
+              functionName: "getHealthFactor" as const,
+              args: [addr],
+            },
+            {
+              address: lendingPoolAddress,
+              abi: LendingPool_ABI,
+              functionName: "debtUSDT" as const,
+              args: [addr],
+            },
+            {
+              address: lendingPoolAddress,
+              abi: LendingPool_ABI,
+              functionName: "collateralETH" as const,
+              args: [addr],
+            },
+          ])
+        : [],
+    [scanAddresses],
+  );
+
+  const scanRead = useReadContracts({
+    contracts: scanContracts,
+    query: {
+      enabled: Boolean(lendingPoolAddress && scanContracts.length > 0),
+      staleTime: 12_000,
+    },
+  });
+
+  const eligibleRows = useMemo(() => {
+    const scanData = scanRead.data;
+    if (!scanData?.length || !scanAddresses.length) return [];
+    const rows: { address: `0x${string}`; hf: bigint; debt: bigint; coll: bigint }[] = [];
+    for (let i = 0; i < scanAddresses.length; i++) {
+      const base = i * 3;
+      const hfVal = asBigint(scanData[base] as MulticallRow);
+      const debtVal = asBigint(scanData[base + 1] as MulticallRow);
+      const collVal = asBigint(scanData[base + 2] as MulticallRow);
+      if (hfVal == null || debtVal == null || collVal == null) continue;
+      if (debtVal === 0n) continue;
+      if (hfVal >= 10n ** 18n) continue;
+      rows.push({ address: scanAddresses[i], hf: hfVal, debt: debtVal, coll: collVal });
+    }
+    return rows.sort((a, b) => (a.hf < b.hf ? -1 : a.hf > b.hf ? 1 : 0));
+  }, [scanRead.data, scanAddresses]);
+
+  const liquidationTarget = eligibleRows[0]?.address;
+
+  const hfRead = useReadContract({
+    abi: LendingPool_ABI,
+    address: lendingPoolAddress,
+    functionName: "getHealthFactor",
+    args: liquidationTarget ? [liquidationTarget] : undefined,
+    query: { enabled: Boolean(lendingPoolAddress && liquidationTarget) },
+  });
+
+  const allowanceRead = useReadContract({
+    abi: MockUSDT_ABI,
+    address: usdtAddress,
+    functionName: "allowance",
+    args: address && lendingPoolAddress ? [address, lendingPoolAddress] : undefined,
+    query: { enabled: Boolean(address && usdtAddress && lendingPoolAddress) },
+  });
+
+  const parsedRepay = useMemo(() => {
+    try {
+      return repayAmount.trim() ? parseUnits(repayAmount.trim(), usdtDecimals) : null;
+    } catch {
+      return null;
+    }
+  }, [repayAmount, usdtDecimals]);
+
+  const hf = hfRead.data as bigint | undefined;
+  const isLiquidatable = hf != null && hf < 10n ** 18n;
+  const needsApprove = parsedRepay != null && (allowanceRead.data as bigint | undefined ?? 0n) < parsedRepay;
+
+  const approveTx = useWriteContract();
+  const liquidateTx = useWriteContract();
+  const approveReceipt = useWaitForTransactionReceipt({ hash: approveTx.data });
+  const liquidateReceipt = useWaitForTransactionReceipt({ hash: liquidateTx.data });
+  useEffect(() => {
+    if (approveReceipt.isSuccess) toast.success("USDT approval confirmed");
+  }, [approveReceipt.isSuccess]);
+  const refetchScanLiquidations = scanRead.refetch;
+  useEffect(() => {
+    if (liquidateReceipt.isSuccess) {
+      toast.success("Liquidation confirmed");
+      void refetchScanLiquidations();
+    }
+  }, [liquidateReceipt.isSuccess, refetchScanLiquidations]);
+  useEffect(() => {
+    if (approveTx.error) toast.error(approveTx.error.message);
+  }, [approveTx.error]);
+  useEffect(() => {
+    if (liquidateTx.error) toast.error(liquidateTx.error.message);
+  }, [liquidateTx.error]);
+
+  const ready = Boolean(isAddress(String(lendingPoolAddress)) && isAddress(String(usdtAddress)));
+  const poolConfigured = Boolean(lendingPoolAddress && isAddress(String(lendingPoolAddress)));
+
+  const scanLoading = poolConfigured && scanRead.isPending && !scanRead.data;
+  const noLiquidatable = poolConfigured && !scanLoading && Boolean(scanRead.data) && eligibleRows.length === 0;
+
+  return (
+    <section className={className}>
+      <h2 className="text-base font-semibold text-slate-100">Liquidate</h2>
+      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+        Repay underwater debt with your USDT; ETH from collateral (plus liquidation bonus) is sent to your wallet. The
+        protocol applies your amount to the most at-risk position (lowest health factor) this app can see.
+      </p>
+      {showAllowanceHint ? (
+        <p className="mt-2 text-xs text-slate-500">
+          Uses the same <strong className="text-slate-400">USDT → pool allowance</strong> as Supply: one approval to the
+          lending pool covers pulls for deposit or liquidation until it is used or you approve again.
+        </p>
+      ) : null}
+
+      {poolConfigured ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          {scanLoading ? <span>Checking positions…</span> : null}
+          {noLiquidatable ? <span>Nothing to liquidate right now.</span> : null}
+          <button
+            type="button"
+            onClick={() => void scanRead.refetch()}
+            disabled={scanRead.isFetching}
+            className={btnNeutral}
+          >
+            {scanRead.isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-amber-400/90">Configure the lending pool in the app settings.</p>
+      )}
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="flex-1 text-sm text-slate-300">
+          <span className={label}>Amount (USDT)</span>
+          <input
+            value={repayAmount}
+            onChange={(e) => setRepayAmount(e.target.value)}
+            placeholder="50"
+            className={input}
+            disabled={!isConnected}
+          />
+        </label>
+        {needsApprove ? (
+          <button
+            type="button"
+            disabled={!isConnected || !ready || !parsedRepay || approveTx.isPending || approveReceipt.isLoading}
+            onClick={() =>
+              approveTx.writeContract({
+                abi: MockUSDT_ABI,
+                address: usdtAddress!,
+                functionName: "approve",
+                args: [lendingPoolAddress!, parsedRepay!],
+              })
+            }
+            className={btnNeutral}
+          >
+            {approveTx.isPending || approveReceipt.isLoading ? "Approving…" : "Approve USDT"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={
+              !isConnected ||
+              !ready ||
+              !liquidationTarget ||
+              !parsedRepay ||
+              !isLiquidatable ||
+              liquidateTx.isPending ||
+              liquidateReceipt.isLoading
+            }
+            onClick={() =>
+              liquidateTx.writeContract({
+                abi: LendingPool_ABI,
+                address: lendingPoolAddress!,
+                functionName: "liquidate",
+                args: [liquidationTarget!, parsedRepay!],
+              })
+            }
+            className={btnPrimary}
+          >
+            {liquidateTx.isPending || liquidateReceipt.isLoading ? "Liquidating…" : "Liquidate"}
+          </button>
+        )}
+      </div>
+
+      {approveTx.error ? <p className="mt-3 text-sm text-red-400">{approveTx.error.message}</p> : null}
+      {liquidateTx.error ? <p className="mt-3 text-sm text-red-400">{liquidateTx.error.message}</p> : null}
+    </section>
+  );
+}
