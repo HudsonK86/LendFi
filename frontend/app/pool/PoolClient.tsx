@@ -13,22 +13,30 @@ import {
 
 import { PageHeader } from "@/components/PageHeader";
 import { LiquidationPanel } from "@/components/LiquidationPanel";
-import { FRToken_ABI, LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { StatTile } from "@/components/StatTile";
+import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI, MockUSDT_ABI } from "@/lib/abi";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
-import { btnNeutral, btnPrimary, card, code, input, label, shell, tableWrap, td, th } from "@/lib/ui";
+import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
 const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` | undefined;
+const usdtOracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as `0x${string}` | undefined;
+
+/** USDT amounts from pool (18 decimals in this project). */
+function fmt(value?: bigint, decimals = 18, digits = 4) {
+  if (value == null) return "—";
+  return Number(formatUnits(value, decimals)).toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function fmtPctBps(bps?: bigint) {
+  if (bps == null) return "—";
+  return `${(Number(bps) / 100).toFixed(2)}%`;
+}
 
 function fmtToken(value?: bigint, digits = 4) {
   if (value == null) return "—";
-  return Number(formatUnits(value, 18)).toLocaleString(undefined, { maximumFractionDigits: digits });
-}
-
-function fmtPct(bps?: bigint) {
-  if (bps == null) return "—";
-  return `${(Number(bps) / 100).toFixed(2)}%`;
+  return Number(formatUnits(value, 18)).toLocaleString("en-US", { maximumFractionDigits: digits });
 }
 
 export function PoolClient() {
@@ -108,6 +116,40 @@ export function PoolClient() {
     functionName: "getBorrowAPY",
     query: { enabled: Boolean(lendingPoolAddress) },
   });
+  const totalReserves = useReadContract({
+    abi: LendingPool_ABI,
+    address: lendingPoolAddress,
+    functionName: "totalReservesUSDT",
+    query: { enabled: Boolean(lendingPoolAddress) },
+  });
+  const poolValue = useReadContract({
+    abi: LendingPool_ABI,
+    address: lendingPoolAddress,
+    functionName: "getPoolValue",
+    query: { enabled: Boolean(lendingPoolAddress) },
+  });
+  const frTotalSupply = useReadContract({
+    abi: FRToken_ABI,
+    address: frTokenAddress,
+    functionName: "totalSupply",
+    query: { enabled: Boolean(frTokenAddress) },
+  });
+  const oraclePrice = useReadContract({
+    abi: MockPriceOracle_ABI,
+    address: usdtOracleAddress,
+    functionName: "getPrice",
+    query: { enabled: Boolean(usdtOracleAddress) },
+  });
+
+  const frUsdtNav = useMemo(() => {
+    const value = poolValue.data as bigint | undefined;
+    const supply = frTotalSupply.data as bigint | undefined;
+    if (value == null || supply == null || supply === 0n) return undefined;
+    return (value * 10n ** 18n) / supply;
+  }, [poolValue.data, frTotalSupply.data]);
+
+  const oracleRaw = oraclePrice.data as bigint | undefined;
+  const oracleHuman = oracleRaw != null ? formatUnits(oracleRaw, 18) : null;
 
   const {
     data: approveHash,
@@ -191,6 +233,9 @@ export function PoolClient() {
           <p>
             FRToken <code className={code}>{frTokenAddress || "missing env"}</code>
           </p>
+          <p>
+            Price oracle <code className={code}>{usdtOracleAddress || "missing env"}</code>
+          </p>
         </div>
       </div>
 
@@ -207,38 +252,34 @@ export function PoolClient() {
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market</h2>
-        <div className={`${tableWrap} mt-3`}>
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead className="border-b border-slate-800 bg-slate-950/50">
-              <tr>
-                <th className={th}>Asset</th>
-                <th className={th}>Total supplied</th>
-                <th className={th}>Total borrowed</th>
-                <th className={th}>Available</th>
-                <th className={th}>Utilization</th>
-                <th className={th}>Supply APY</th>
-                <th className={th}>Borrow APY</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-slate-800/80 bg-slate-900/20">
-                <td className={td}>
-                  <span className="font-medium text-slate-100">USDT</span>
-                  <span className="ml-2 text-xs text-slate-500">→ FR</span>
-                </td>
-                <td className={`${td} tabular-nums`}>{fmtToken(totalSupplied.data as bigint | undefined)}</td>
-                <td className={`${td} tabular-nums`}>{fmtToken(totalBorrowed.data as bigint | undefined)}</td>
-                <td className={`${td} tabular-nums`}>{fmtToken(availableLiquidity.data as bigint | undefined)}</td>
-                <td className={`${td} tabular-nums`}>{fmtPct(utilization.data as bigint | undefined)}</td>
-                <td className={`${td} tabular-nums text-emerald-400/90`}>
-                  {fmtPct(supplyApy.data as bigint | undefined)}
-                </td>
-                <td className={`${td} tabular-nums text-amber-300/90`}>
-                  {fmtPct(borrowApy.data as bigint | undefined)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile label="Total supplied (USDT)" value={fmt(totalSupplied.data as bigint | undefined)} hint="In pool" />
+          <StatTile label="Total borrowed (USDT)" value={fmt(totalBorrowed.data as bigint | undefined)} />
+          <StatTile label="Available liquidity (USDT)" value={fmt(availableLiquidity.data as bigint | undefined)} />
+          <StatTile label="Reserves (USDT)" value={fmt(totalReserves.data as bigint | undefined)} />
+          <StatTile label="Utilization (%)" value={fmtPctBps(utilization.data as bigint | undefined)} />
+          <StatTile
+            label="Borrow APY (%)"
+            value={fmtPctBps(borrowApy.data as bigint | undefined)}
+            hint="Variable from model"
+          />
+          <StatTile label="Supply APY (%)" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
+          <StatTile
+            label="ETH / USDT oracle"
+            value={oracleHuman != null ? `${Number(oracleHuman).toLocaleString("en-US")} USDT/ETH` : "—"}
+            hint={oracleRaw != null ? `Raw ${oracleRaw.toString()}` : undefined}
+          />
+          <StatTile
+            label="FR / USDT (NAV)"
+            value={frUsdtNav != null ? `${fmt(frUsdtNav)} USDT` : "—"}
+            hint={
+              (frTotalSupply.data as bigint | undefined) === 0n
+                ? "No FR supply yet"
+                : frUsdtNav != null
+                  ? "Implied pool value per 1 FR"
+                  : undefined
+            }
+          />
         </div>
       </section>
 
@@ -351,7 +392,7 @@ export function PoolClient() {
       </section>
 
       {isConnected ? (
-        <LiquidationPanel className={`${card} mt-6`} showAllowanceHint />
+        <LiquidationPanel className={`${card} mt-6`} />
       ) : null}
 
       {!ready ? (

@@ -241,7 +241,7 @@ export function BorrowClient() {
               <StatTile label="Collateral (ETH)" value={fmt(collateralRead.data as bigint | undefined)} />
               <StatTile label="Debt (USDT)" value={fmt(debtRead.data as bigint | undefined, usdtDecimals)} />
               <StatTile label="Max borrow (USDT)" value={fmt(maxBorrow, usdtDecimals)} />
-              <StatTile label="Collateral value" value={fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)} />
+              <StatTile label="Collateral value (USDT)" value={fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)} />
               <StatTile label="Debt value" value={fmt(debtValueRead.data as bigint | undefined, usdtDecimals)} />
               <StatTile label="Wallet USDT" value={fmt(usdtWalletRead.data as bigint | undefined, usdtDecimals)} />
             </div>

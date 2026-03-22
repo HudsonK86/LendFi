@@ -14,7 +14,7 @@ npx hardhat node
 npx hardhat ignition deploy ignition/modules/LendingPool.ts --network localhost
 ```
 
-3. Copy deployed addresses into `frontend/.env` (`NEXT_PUBLIC_*`).
+3. Copy deployed addresses into `frontend/.env`. See `frontend/.env.example` for the full list. At minimum: `NEXT_PUBLIC_LENDING_POOL_ADDRESS`, `NEXT_PUBLIC_MOCK_USDT_ADDRESS`, `NEXT_PUBLIC_FRTOKEN_ADDRESS`, and **`NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS`** (used by Pool/Dashboard for ETH/USDT oracle and borrow pricing).
 
 ## Mint MockUSDT to test accounts
 

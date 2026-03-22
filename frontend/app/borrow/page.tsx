@@ -1,5 +1,5 @@
-import { BorrowClient } from "./BorrowClient";
+import { BorrowPageClient } from "./BorrowPageClient";
 
 export default function BorrowPage() {
-  return <BorrowClient />;
+  return <BorrowPageClient />;
 }

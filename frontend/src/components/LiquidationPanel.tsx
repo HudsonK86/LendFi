@@ -29,11 +29,9 @@ function asBigint(row: MulticallRow | undefined): bigint | undefined {
 type LiquidationPanelProps = {
   /** Extra class for the outer section (default: card shell) */
   className?: string;
-  /** Show intro line about shared allowance with supply */
-  showAllowanceHint?: boolean;
 };
 
-export function LiquidationPanel({ className = card, showAllowanceHint = false }: LiquidationPanelProps) {
+export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
   const [repayAmount, setRepayAmount] = useState("");
 
   const { address, isConnected } = useAccount();
@@ -161,15 +159,8 @@ export function LiquidationPanel({ className = card, showAllowanceHint = false }
     <section className={className}>
       <h2 className="text-base font-semibold text-slate-100">Liquidate</h2>
       <p className="mt-1 text-xs leading-relaxed text-slate-500">
-        Repay underwater debt with your USDT; ETH from collateral (plus liquidation bonus) is sent to your wallet. The
-        protocol applies your amount to the most at-risk position (lowest health factor) this app can see.
+        Repay underwater debt with your USDT; ETH from collateral (plus liquidation bonus) is sent to your wallet.
       </p>
-      {showAllowanceHint ? (
-        <p className="mt-2 text-xs text-slate-500">
-          Uses the same <strong className="text-slate-400">USDT → pool allowance</strong> as Supply: one approval to the
-          lending pool covers pulls for deposit or liquidation until it is used or you approve again.
-        </p>
-      ) : null}
 
       {poolConfigured ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
