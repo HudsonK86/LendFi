@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 import { card } from "@/lib/ui";
@@ -108,6 +108,27 @@ function eventUnit(eventName: string): "ETH" | "USDT" | "RAW" {
   return "RAW";
 }
 
+function humanEventLabel(eventName: string): string {
+  switch (eventName) {
+    case "DepositLiquidity":
+      return "Deposit Liquidity (USDT)";
+    case "WithdrawLiquidity":
+      return "Withdraw Liquidity (USDT)";
+    case "DepositCollateral":
+      return "Deposit Collateral (ETH)";
+    case "WithdrawCollateral":
+      return "Withdraw Collateral (ETH)";
+    case "Borrow":
+      return "Borrow (USDT)";
+    case "Repay":
+      return "Repay (USDT)";
+    case "Liquidate":
+      return "Liquidate Position";
+    default:
+      return eventName;
+  }
+}
+
 function fmtAmountBaseUnits(amountBaseUnits: string | null, eventName: string): string {
   if (!amountBaseUnits) return "—";
   const unit = eventUnit(eventName);
@@ -133,6 +154,7 @@ export function PoolAnalyticsPanel() {
   const lastToastedError = useRef<string | null>(null);
   const [range, setRange] = useState<"24h" | "7d">("24h");
   const [mounted, setMounted] = useState(false);
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -187,6 +209,24 @@ export function PoolAnalyticsPanel() {
   const maxHourly = chartSeries.reduce((m, p) => (p.count > m ? p.count : m), 0);
   const eventMix = analytics?.protocolEventCounts ?? [];
   const maxEventCount = eventMix.reduce((m, p) => (p.count > m ? p.count : m), 0);
+  const availableEvents = useMemo(() => eventMix.map((e) => e.event), [eventMix]);
+
+  useEffect(() => {
+    if (availableEvents.length === 0) {
+      setSelectedEvents((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    setSelectedEvents((prev) => {
+      const kept = prev.filter((e) => availableEvents.includes(e));
+      const next = kept.length > 0 ? kept : [...availableEvents];
+      if (next.length === prev.length && next.every((v, i) => v === prev[i])) return prev;
+      return next;
+    });
+  }, [availableEvents]);
+
+  const filteredActivity = (analytics?.recentProtocolActivity ?? []).filter((r) =>
+    selectedEvents.includes(r.event_name),
+  );
 
   if (!mounted) {
     return (
@@ -324,7 +364,7 @@ export function PoolAnalyticsPanel() {
                     return (
                       <li key={row.event}>
                         <div className="mb-1 flex justify-between">
-                          <span>{row.event}</span>
+                          <span>{humanEventLabel(row.event)}</span>
                           <span className="tabular-nums text-slate-400">{row.count}</span>
                         </div>
                         <div className="h-2 rounded bg-slate-800">
@@ -339,18 +379,48 @@ export function PoolAnalyticsPanel() {
           </div>
           <div className="mt-8">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent protocol activity</h3>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setSelectedEvents([...availableEvents])}
+                className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300 hover:text-slate-100"
+              >
+                All
+              </button>
+              {availableEvents.map((eventName) => {
+                const selected = selectedEvents.includes(eventName);
+                return (
+                  <button
+                    key={eventName}
+                    type="button"
+                    onClick={() =>
+                      setSelectedEvents((prev) =>
+                        prev.includes(eventName) ? prev.filter((e) => e !== eventName) : [...prev, eventName],
+                      )
+                    }
+                    className={`rounded border px-2 py-1 ${
+                      selected
+                        ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
+                        : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {humanEventLabel(eventName)}
+                  </button>
+                );
+              })}
+            </div>
             <ul className="mt-3 max-h-72 space-y-2 overflow-auto text-xs text-slate-400">
-              {analytics.recentProtocolActivity.length === 0 ? (
+              {filteredActivity.length === 0 ? (
                 <li className="text-slate-500">No protocol activity rows.</li>
               ) : null}
-              {analytics.recentProtocolActivity.map((r) => (
+              {filteredActivity.map((r) => (
                 <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
                   {r.event_name === "Liquidate" ? (
                     <span className="mr-1 rounded border border-rose-500/40 bg-rose-500/10 px-1 text-[10px] text-rose-300">
                       LIQ
                     </span>
                   ) : null}
-                  {fmtTime(r.created_at)} · {r.event_name} · user {shortAddress(r.user_address)} · amt{" "}
+                  {fmtTime(r.created_at)} · {humanEventLabel(r.event_name)} · user {shortAddress(r.user_address)} · amt{" "}
                   {fmtAmountBaseUnits(r.amount_base_units, r.event_name)} ·{" "}
                   <button
                     type="button"

@@ -67,6 +67,7 @@ function asBigint(row: MulticallRow | undefined): bigint | undefined {
 }
 
 export function PoolClient() {
+  const [actionTab, setActionTab] = useState<"deposit" | "withdraw" | "liquidate">("deposit");
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawFrAmount, setWithdrawFrAmount] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -222,7 +223,7 @@ export function PoolClient() {
             },
           ])
         : [],
-    [scanAddresses],
+    [lendingPoolAddress, scanAddresses],
   );
 
   const liquidationScanRead = useReadContracts({
@@ -345,6 +346,23 @@ export function PoolClient() {
     }
   }, [withdrawFrAmount]);
 
+  const estimatedFrMinted = useMemo(() => {
+    if (parsedDeposit == null) return undefined;
+    const frSupply = frTotalSupply.data as bigint | undefined;
+    const poolVal = poolValue.data as bigint | undefined;
+    if (frSupply == null || frSupply === 0n) return parsedDeposit;
+    if (poolVal == null || poolVal === 0n) return undefined;
+    return (parsedDeposit * frSupply) / poolVal;
+  }, [parsedDeposit, frTotalSupply.data, poolValue.data]);
+
+  const estimatedWithdrawUsdt = useMemo(() => {
+    if (parsedWithdrawFr == null) return undefined;
+    const frSupply = frTotalSupply.data as bigint | undefined;
+    const poolVal = poolValue.data as bigint | undefined;
+    if (frSupply == null || frSupply === 0n || poolVal == null) return undefined;
+    return (parsedWithdrawFr * poolVal) / frSupply;
+  }, [parsedWithdrawFr, frTotalSupply.data, poolValue.data]);
+
   const needsApprove = parsedDeposit != null && (allowance.data as bigint | undefined ?? 0n) < parsedDeposit;
   const ready =
     Boolean(isAddress(String(usdtAddress))) &&
@@ -357,8 +375,6 @@ export function PoolClient() {
         title="Pool"
         subtitle="Supply USDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
       />
-
-      <PoolAnalyticsPanel />
 
       {!mounted ? (
         <p className="mt-8 text-sm text-slate-500">Loading wallet…</p>
@@ -429,6 +445,8 @@ export function PoolClient() {
         </div>
       </section>
 
+      <PoolAnalyticsPanel />
+
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className={card}>
           <h2 className="text-base font-semibold text-slate-100">Your balances</h2>
@@ -461,88 +479,134 @@ export function PoolClient() {
         </section>
 
         <section className={card}>
-          <h2 className="text-base font-semibold text-slate-100">Deposit USDT</h2>
-          <p className="mt-1 text-xs text-slate-500">Approve once if needed, then deposit into the pool.</p>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="flex-1 text-sm text-slate-300">
-              <span className={label}>Amount</span>
-              <input
-                className={input}
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                placeholder="1000"
-              />
-            </label>
-            {needsApprove ? (
+          <h2 className="text-base font-semibold text-slate-100">Pool actions</h2>
+          <div className="mt-3 inline-flex rounded-lg border border-slate-800 bg-slate-950/40 p-1 text-xs">
+            {(["deposit", "withdraw", "liquidate"] as const).map((tab) => (
               <button
+                key={tab}
                 type="button"
-                disabled={!isConnected || !ready || !parsedDeposit || isApprovePending || approveReceipt.isLoading}
-                onClick={() =>
-                  writeApprove({
-                    abi: MockUSDT_ABI,
-                    address: usdtAddress!,
-                    functionName: "approve",
-                    args: [lendingPoolAddress!, parsedDeposit!],
-                  })
-                }
-                className={btnNeutral}
+                onClick={() => setActionTab(tab)}
+                className={`rounded px-2 py-1 capitalize ${
+                  actionTab === tab ? "bg-slate-700 text-slate-100" : "text-slate-400 hover:text-slate-200"
+                }`}
               >
-                {isApprovePending || approveReceipt.isLoading ? "Approving…" : "Approve USDT"}
+                {tab}
               </button>
-            ) : (
-              <button
-                type="button"
-                disabled={!isConnected || !ready || !parsedDeposit || isDepositPending || depositReceipt.isLoading}
-                onClick={() =>
-                  writeDeposit({
-                    abi: LendingPool_ABI,
-                    address: lendingPoolAddress!,
-                    functionName: "depositLiquidity",
-                    args: [parsedDeposit!],
-                  })
-                }
-                className={btnPrimary}
-              >
-                {isDepositPending || depositReceipt.isLoading ? "Depositing…" : "Deposit"}
-              </button>
-            )}
+            ))}
           </div>
+          {actionTab === "deposit" ? (
+            <>
+              <p className="mt-3 text-xs text-slate-500">Approve once if needed, then deposit into the pool.</p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="flex-1 text-sm text-slate-300">
+                  <span className={`${label} flex items-center justify-between`}>
+                    <span>Amount</span>
+                    <button
+                      type="button"
+                      className="text-cyan-400/90 hover:text-cyan-300"
+                      onClick={() => setDepositAmount(fmtToken(usdtBalance.data as bigint | undefined, 6).replace(/,/g, ""))}
+                    >
+                      Max
+                    </button>
+                  </span>
+                  <input
+                    className={input}
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="1000"
+                  />
+                </label>
+                {needsApprove ? (
+                  <button
+                    type="button"
+                    disabled={!isConnected || !ready || !parsedDeposit || isApprovePending || approveReceipt.isLoading}
+                    onClick={() =>
+                      writeApprove({
+                        abi: MockUSDT_ABI,
+                        address: usdtAddress!,
+                        functionName: "approve",
+                        args: [lendingPoolAddress!, parsedDeposit!],
+                      })
+                    }
+                    className={btnNeutral}
+                  >
+                    {isApprovePending || approveReceipt.isLoading ? "Approving…" : "Approve USDT"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!isConnected || !ready || !parsedDeposit || isDepositPending || depositReceipt.isLoading}
+                    onClick={() =>
+                      writeDeposit({
+                        abi: LendingPool_ABI,
+                        address: lendingPoolAddress!,
+                        functionName: "depositLiquidity",
+                        args: [parsedDeposit!],
+                      })
+                    }
+                    className={btnPrimary}
+                  >
+                    {isDepositPending || depositReceipt.isLoading ? "Depositing…" : "Deposit"}
+                  </button>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Est. FR minted: <span className="text-slate-300">{fmtToken(estimatedFrMinted, 6)}</span>
+              </p>
+            </>
+          ) : null}
+
+          {actionTab === "withdraw" ? (
+            <>
+              <p className="mt-3 text-xs text-slate-500">Burn FR to withdraw your share of pool USDT.</p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="flex-1 text-sm text-slate-300">
+                  <span className={`${label} flex items-center justify-between`}>
+                    <span>FR amount</span>
+                    <button
+                      type="button"
+                      className="text-cyan-400/90 hover:text-cyan-300"
+                      onClick={() => setWithdrawFrAmount(fmtToken(frBalance.data as bigint | undefined, 6).replace(/,/g, ""))}
+                    >
+                      Max
+                    </button>
+                  </span>
+                  <input
+                    className={input}
+                    value={withdrawFrAmount}
+                    onChange={(e) => setWithdrawFrAmount(e.target.value)}
+                    placeholder="50"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!isConnected || !ready || !parsedWithdrawFr || isWithdrawPending || withdrawReceipt.isLoading}
+                  onClick={() =>
+                    writeWithdraw({
+                      abi: LendingPool_ABI,
+                      address: lendingPoolAddress!,
+                      functionName: "withdrawLiquidity",
+                      args: [parsedWithdrawFr!],
+                    })
+                  }
+                  className={btnPrimary}
+                >
+                  {isWithdrawPending || withdrawReceipt.isLoading ? "Withdrawing…" : "Withdraw"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Est. USDT out: <span className="text-slate-300">{fmtToken(estimatedWithdrawUsdt, 6)}</span>
+              </p>
+            </>
+          ) : null}
+
+          {actionTab === "liquidate" ? (
+            <div className="mt-4">
+              {isConnected ? <LiquidationPanel className="border-0 bg-transparent p-0 shadow-none" /> : null}
+            </div>
+          ) : null}
         </section>
       </div>
-
-      <section className={`${card} mt-6`}>
-        <h2 className="text-base font-semibold text-slate-100">Withdraw (burn FR)</h2>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm text-slate-300">
-            <span className={label}>FR amount</span>
-            <input
-              className={input}
-              value={withdrawFrAmount}
-              onChange={(e) => setWithdrawFrAmount(e.target.value)}
-              placeholder="50"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={!isConnected || !ready || !parsedWithdrawFr || isWithdrawPending || withdrawReceipt.isLoading}
-            onClick={() =>
-              writeWithdraw({
-                abi: LendingPool_ABI,
-                address: lendingPoolAddress!,
-                functionName: "withdrawLiquidity",
-                args: [parsedWithdrawFr!],
-              })
-            }
-            className={btnPrimary}
-          >
-            {isWithdrawPending || withdrawReceipt.isLoading ? "Withdrawing…" : "Withdraw"}
-          </button>
-        </div>
-      </section>
-
-      {isConnected ? (
-        <LiquidationPanel className={`${card} mt-6`} />
-      ) : null}
 
       {!ready ? (
         <p className="mt-8 text-sm text-red-400">
