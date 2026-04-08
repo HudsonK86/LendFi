@@ -149,5 +149,83 @@ export const LendingPool_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "totalCollateralETH",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      { indexed: false, internalType: "uint256", name: "amountUSDT", type: "uint256" },
+    ],
+    name: "DepositLiquidity",
+    type: "event",
+    anonymous: false,
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      { indexed: false, internalType: "uint256", name: "frAmount", type: "uint256" },
+      { indexed: false, internalType: "uint256", name: "amountUSDT", type: "uint256" },
+    ],
+    name: "WithdrawLiquidity",
+    type: "event",
+    anonymous: false,
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      { indexed: false, internalType: "uint256", name: "amountETH", type: "uint256" },
+    ],
+    name: "DepositCollateral",
+    type: "event",
+    anonymous: false,
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      { indexed: false, internalType: "uint256", name: "amountETH", type: "uint256" },
+    ],
+    name: "WithdrawCollateral",
+    type: "event",
+    anonymous: false,
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "borrower", type: "address" },
+      { indexed: false, internalType: "uint256", name: "amountUSDT", type: "uint256" },
+    ],
+    name: "Borrow",
+    type: "event",
+    anonymous: false,
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "borrower", type: "address" },
+      { indexed: false, internalType: "uint256", name: "amountUSDT", type: "uint256" },
+    ],
+    name: "Repay",
+    type: "event",
+    anonymous: false,
+  },
+  {
+    inputs: [
+      { indexed: true, internalType: "address", name: "borrower", type: "address" },
+      { indexed: true, internalType: "address", name: "liquidator", type: "address" },
+      { indexed: false, internalType: "uint256", name: "repayUSDT", type: "uint256" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "collateralTakenETH",
+        type: "uint256",
+      },
+    ],
+    name: "Liquidate",
+    type: "event",
+    anonymous: false,
+  },
 ] as const;
 

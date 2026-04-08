@@ -32,10 +32,27 @@ contract LendingPool {
     uint256 public totalReservesUSDT;
 
     // ─── New state ────────────────────────────────────────────────────────
+    /// @notice Total ETH currently locked as collateral across all borrowers.
+    uint256 public totalCollateralETH;
+
     /// @notice Remaining lender principal accounting base.
     /// Increases by amount on deposit; decreases by principalRedeemed on withdrawal.
     /// Does not include earned interest — poolValue represents full lender claim value.
     uint256 public totalSuppliedUSDT;
+
+    // ─── Events ──────────────────────────────────────────────────────────
+    event DepositLiquidity(address indexed user, uint256 amountUSDT);
+    event WithdrawLiquidity(address indexed user, uint256 frAmount, uint256 amountUSDT);
+    event DepositCollateral(address indexed user, uint256 amountETH);
+    event WithdrawCollateral(address indexed user, uint256 amountETH);
+    event Borrow(address indexed borrower, uint256 amountUSDT);
+    event Repay(address indexed borrower, uint256 amountUSDT);
+    event Liquidate(
+        address indexed borrower,
+        address indexed liquidator,
+        uint256 repayUSDT,
+        uint256 collateralTakenETH
+    );
 
     // BPS constants (section 7.2)
     uint256 private constant MAX_LTV_BPS               = 7000;
@@ -176,6 +193,8 @@ contract LendingPool {
 
         frToken.mint(msg.sender, sharesMinted);
         totalSuppliedUSDT += amount;
+
+        emit DepositLiquidity(msg.sender, amount);
     }
 
     function withdrawLiquidity(uint256 frAmount) external {
@@ -196,11 +215,17 @@ contract LendingPool {
         totalSuppliedUSDT -= principalRedeemed;
 
         require(usdt.transfer(msg.sender, redeemAmt), "TRANSFER_FAILED");
+
+        emit WithdrawLiquidity(msg.sender, frAmount, redeemAmt);
     }
 
     function depositCollateral() external payable {
         require(msg.value > 0, "ZERO_COLLATERAL");
         collateralETH[msg.sender] += msg.value;
+
+        totalCollateralETH += msg.value;
+
+        emit DepositCollateral(msg.sender, msg.value);
     }
 
     function borrow(uint256 borrowAmount) external {
@@ -223,6 +248,8 @@ contract LendingPool {
 
         debtUSDT[msg.sender] = newDebt;
         totalBorrowedUSDT += borrowAmount;
+
+        emit Borrow(msg.sender, borrowAmount);
     }
 
     function repay(uint256 repayAmount) external {
@@ -237,6 +264,8 @@ contract LendingPool {
 
         debtUSDT[msg.sender] -= reduction;
         totalBorrowedUSDT -= reduction;
+
+        emit Repay(msg.sender, reduction);
     }
 
     function withdrawCollateral(uint256 ethAmount) external {
@@ -254,8 +283,13 @@ contract LendingPool {
         );
 
         collateralETH[msg.sender] = postCollateral;
+
+        totalCollateralETH -= ethAmount;
+
         (bool sent, ) = msg.sender.call{value: ethAmount}("");
         require(sent, "ETH_TRANSFER_FAILED");
+
+        emit WithdrawCollateral(msg.sender, ethAmount);
     }
 
     function liquidate(address borrower, uint256 repayAmount) external {
@@ -287,9 +321,13 @@ contract LendingPool {
         totalBorrowedUSDT -= repayActual;
         collateralETH[borrower] -= collateralSeizedActual;
 
+        totalCollateralETH -= collateralSeizedActual;
+
         // Transfer seized ETH to liquidator
         (bool sent, ) = msg.sender.call{value: collateralSeizedActual}("");
         require(sent, "ETH_TRANSFER_FAILED");
+
+        emit Liquidate(borrower, msg.sender, repayActual, collateralSeizedActual);
     }
 
     // ─── Public View Functions ────────────────────────────────────────────
