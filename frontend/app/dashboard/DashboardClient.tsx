@@ -16,6 +16,8 @@ const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` 
 
 const BORROWER_POSITION_REFETCH_MS = 10_000;
 
+const ORACLE_DISPLAY_DIGITS = 8;
+
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
   return Number(formatUnits(value, decimals)).toLocaleString("en-US", { maximumFractionDigits: digits });
@@ -170,7 +172,6 @@ export function DashboardClient() {
   }, [borrowerDebtVal, borrowerCollateralVal]);
 
   const oracleRaw = oraclePrice.data as bigint | undefined;
-  const oracleHuman = oracleRaw != null ? formatUnits(oracleRaw, 18) : null;
 
   return (
     <main className={shell}>
@@ -203,8 +204,7 @@ export function DashboardClient() {
               <StatTile label="Supply APY" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
               <StatTile
                 label="ETH / USDT oracle"
-                value={oracleHuman != null ? `${Number(oracleHuman).toLocaleString("en-US")} USDT/ETH` : "—"}
-                hint={oracleRaw != null ? `Raw ${oracleRaw.toString()}` : undefined}
+                value={oracleRaw != null ? `${fmt(oracleRaw, 18, ORACLE_DISPLAY_DIGITS)} USDT/ETH` : "—"}
               />
             </div>
           </section>

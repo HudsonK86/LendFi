@@ -33,6 +33,10 @@ function fmt(value?: bigint, decimals = 18, digits = 4) {
   return Number(formatUnits(value, decimals)).toLocaleString("en-US", { maximumFractionDigits: digits });
 }
 
+/** Extra fraction digits for oracle price & FR NAV so small drift vs 0.5 / 1.0 is visible. */
+const ORACLE_DISPLAY_DIGITS = 8;
+const NAV_DISPLAY_DIGITS = 10;
+
 function fmtPctBps(bps?: bigint) {
   if (bps == null) return "—";
   return `${(Number(bps) / 100).toFixed(2)}%`;
@@ -164,6 +168,12 @@ export function PoolClient() {
     functionName: "totalSupply",
     query: { enabled: Boolean(frTokenAddress) },
   });
+  const frDecimalsRead = useReadContract({
+    abi: FRToken_ABI,
+    address: frTokenAddress,
+    functionName: "decimals",
+    query: { enabled: Boolean(frTokenAddress) },
+  });
   const oraclePrice = useReadContract({
     abi: MockPriceOracle_ABI,
     address: usdtOracleAddress,
@@ -171,15 +181,19 @@ export function PoolClient() {
     query: { enabled: Boolean(usdtOracleAddress) },
   });
 
+  /** USDT redeemable per 1 full FR — same as `withdrawLiquidity(10**frDecimals)` / 10**usdtDecimals in human terms. */
   const frUsdtNav = useMemo(() => {
     const value = poolValue.data as bigint | undefined;
     const supply = frTotalSupply.data as bigint | undefined;
-    if (value == null || supply == null || supply === 0n) return undefined;
-    return (value * 10n ** 18n) / supply;
-  }, [poolValue.data, frTotalSupply.data]);
+    const frD = Number(frDecimalsRead.data ?? 18);
+    if (value == null || supply == null || supply === 0n || !Number.isFinite(frD) || frD < 0 || frD > 77) {
+      return undefined;
+    }
+    const oneFr = 10n ** BigInt(frD);
+    return (value * oneFr) / supply;
+  }, [poolValue.data, frTotalSupply.data, frDecimalsRead.data]);
 
   const oracleRaw = oraclePrice.data as bigint | undefined;
-  const oracleHuman = oracleRaw != null ? formatUnits(oracleRaw, 18) : null;
 
   const scanAddresses = useMemo(() => getLiquidationScanAddresses(), []);
 
@@ -414,17 +428,16 @@ export function PoolClient() {
           />
           <StatTile
             label="ETH / USDT oracle"
-            value={oracleHuman != null ? `${Number(oracleHuman).toLocaleString("en-US")} USDT/ETH` : "—"}
-            hint={oracleRaw != null ? `Raw ${oracleRaw.toString()}` : undefined}
+            value={oracleRaw != null ? `${fmt(oracleRaw, 18, ORACLE_DISPLAY_DIGITS)} USDT/ETH` : "—"}
           />
           <StatTile
             label="FR / USDT (NAV)"
-            value={frUsdtNav != null ? `${fmt(frUsdtNav)} USDT` : "—"}
+            value={frUsdtNav != null ? `${fmt(frUsdtNav, decimals, NAV_DISPLAY_DIGITS)} USDT` : "—"}
             hint={
               (frTotalSupply.data as bigint | undefined) === 0n
                 ? "No FR supply yet"
                 : frUsdtNav != null
-                  ? "Implied pool value per 1 FR"
+                  ? "USDT per 1 FR; same as burning 1 FR via withdrawLiquidity"
                   : undefined
             }
           />
