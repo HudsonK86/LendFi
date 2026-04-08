@@ -12,7 +12,7 @@ export default function AdminHomePage() {
       </div>
       <h1 className="text-2xl font-semibold tracking-tight text-slate-50">Protocol controls</h1>
       <p className="mt-3 text-sm leading-relaxed text-slate-400">
-        You are signed in. Use the authorized MetaMask wallet below to update on-chain oracle parameters.
+        You are signed in. Use the authorized wallet in the header to update on-chain oracle parameters.
       </p>
       <AdminOraclePanel />
       <AdminAnalyticsPanel />
