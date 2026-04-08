@@ -129,6 +129,16 @@ async function indexOnce(): Promise<boolean> {
   const currentBlock = await client.getBlockNumber();
   let lastIndexed = await getLastIndexedBlock();
 
+  // Local dev chains are often reset. If DB checkpoint is ahead of chain head,
+  // auto-reset to allow reindexing without manual SQL cleanup.
+  if (lastIndexed > currentBlock) {
+    console.warn(
+      `Indexer checkpoint (${lastIndexed.toString()}) is ahead of chain head (${currentBlock.toString()}); resetting checkpoint to 0.`,
+    );
+    lastIndexed = 0n;
+    await setLastIndexedBlock(0n);
+  }
+
   if (lastIndexed === 0n) {
     // start a little before current head to pick up recent events
     const backfill = 1_000n;

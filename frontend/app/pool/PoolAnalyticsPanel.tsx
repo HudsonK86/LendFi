@@ -46,6 +46,49 @@ function fmtTime(value: string): string {
   });
 }
 
+function compactBucketLabel(value: string): string {
+  // yyyy-mm-dd hh:00:00 -> hh:00 ; yyyy-mm-dd -> mm-dd
+  if (value.includes(" ")) return value.slice(11, 16);
+  if (value.length >= 10) return value.slice(5, 10);
+  return value;
+}
+
+type SeriesPoint = { label: string; count: number };
+
+function buildSeries(hourly: Array<{ hour: string; count: number }>, range: "24h" | "7d"): SeriesPoint[] {
+  const now = new Date();
+  if (range === "24h") {
+    const end = new Date(now);
+    end.setMinutes(0, 0, 0);
+    const buckets: SeriesPoint[] = [];
+    const byLabel = new Map(hourly.map((h) => [compactBucketLabel(h.hour), h.count]));
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(end);
+      d.setHours(end.getHours() - i);
+      const label = `${d.getHours().toString().padStart(2, "0")}:00`;
+      buckets.push({ label, count: byLabel.get(label) ?? 0 });
+    }
+    return buckets;
+  }
+
+  const end = new Date(now);
+  end.setHours(0, 0, 0, 0);
+  const buckets: SeriesPoint[] = [];
+  const byLabel = new Map(hourly.map((h) => [compactBucketLabel(h.hour), h.count]));
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(end.getDate() - i);
+    const label = `${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+    buckets.push({ label, count: byLabel.get(label) ?? 0 });
+  }
+  return buckets;
+}
+
+function linePath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return "";
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+}
+
 function shortAddress(v: string | null | undefined): string {
   if (!v) return "—";
   return `${v.slice(0, 6)}...${v.slice(-4)}`;
@@ -140,7 +183,8 @@ export function PoolAnalyticsPanel() {
   }
 
   const hourly = analytics?.hourlyActivity ?? [];
-  const maxHourly = hourly.reduce((m, p) => (p.count > m ? p.count : m), 0);
+  const chartSeries = analytics ? buildSeries(hourly, analytics.range) : [];
+  const maxHourly = chartSeries.reduce((m, p) => (p.count > m ? p.count : m), 0);
   const eventMix = analytics?.protocolEventCounts ?? [];
   const maxEventCount = eventMix.reduce((m, p) => (p.count > m ? p.count : m), 0);
 
@@ -186,31 +230,83 @@ export function PoolAnalyticsPanel() {
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <div className="rounded-lg border border-slate-800/80 bg-slate-950/40 p-4">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Activity ({analytics.range === "7d" ? "last 7d" : "last 24h"})
+                Transaction activity ({analytics.range === "7d" ? "last 7 days" : "last 24 hours"})
               </h3>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Y-axis: number of indexed pool events per {analytics.range === "7d" ? "day" : "hour"}.
+              </p>
               {hourly.length === 0 ? (
                 <p className="mt-3 text-xs text-slate-500">
                   No activity in the last {analytics.range === "7d" ? "7 days" : "24 hours"}.
                 </p>
               ) : (
                 <>
-                  <div className="mt-4 flex h-28 items-end gap-1">
-                    {hourly.map((p) => {
-                      const h = maxHourly === 0 ? 0 : Math.max(6, Math.round((p.count / maxHourly) * 100));
-                      return (
-                        <div
-                          key={p.hour}
-                          className="flex-1 rounded-sm bg-cyan-500/70"
-                          style={{ height: `${h}%` }}
-                          title={`${p.hour}: ${p.count}`}
+                  <div className="mt-4 rounded-md border border-slate-800/80 bg-slate-950/40 p-2">
+                    <svg viewBox="0 0 1000 240" className="h-48 w-full">
+                      <defs>
+                        <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="rgba(34, 211, 238, 0.45)" />
+                          <stop offset="100%" stopColor="rgba(34, 211, 238, 0.02)" />
+                        </linearGradient>
+                      </defs>
+                      {[0, 25, 50, 75, 100].map((g) => (
+                        <line
+                          key={g}
+                          x1="40"
+                          x2="980"
+                          y1={20 + ((100 - g) / 100) * 180}
+                          y2={20 + ((100 - g) / 100) * 180}
+                          stroke="rgba(148,163,184,0.18)"
+                          strokeWidth="1"
                         />
-                      );
-                    })}
+                      ))}
+                      {(() => {
+                        const left = 40;
+                        const width = 940;
+                        const top = 20;
+                        const height = 180;
+                        const points = chartSeries.map((p, i) => {
+                          const x = left + (chartSeries.length === 1 ? 0 : (i / (chartSeries.length - 1)) * width);
+                          const ratio = maxHourly === 0 ? 0 : p.count / maxHourly;
+                          const y = top + (1 - ratio) * height;
+                          return { x, y, count: p.count, label: p.label };
+                        });
+                        const strokePath = linePath(points);
+                        const areaPath =
+                          points.length > 1
+                            ? `${strokePath} L ${left + width} ${top + height} L ${left} ${top + height} Z`
+                            : "";
+                        return (
+                          <>
+                            {areaPath ? <path d={areaPath} fill="url(#activityFill)" /> : null}
+                            {strokePath ? (
+                              <path
+                                d={strokePath}
+                                fill="none"
+                                stroke="rgb(34,211,238)"
+                                strokeWidth="2.5"
+                                strokeLinejoin="round"
+                                strokeLinecap="round"
+                              />
+                            ) : null}
+                            {points.map((p) => (
+                              <g key={`${p.label}-${p.count}`}>
+                                <circle cx={p.x} cy={p.y} r="3" fill="rgb(34,211,238)" />
+                                <title>{`${p.label}: ${p.count} event(s)`}</title>
+                              </g>
+                            ))}
+                            <text x="12" y="28" fill="rgba(148,163,184,0.9)" fontSize="11">
+                              max {maxHourly} events
+                            </text>
+                          </>
+                        );
+                      })()}
+                    </svg>
                   </div>
                   <div className="mt-2 flex justify-between text-[11px] text-slate-500">
-                    <span>{hourly[0]?.hour ?? "—"}</span>
-                    <span>{analytics.range}</span>
-                    <span>{hourly[hourly.length - 1]?.hour ?? "—"}</span>
+                    <span>Start: {chartSeries[0]?.label ?? "—"}</span>
+                    <span>{analytics.range === "7d" ? "Daily buckets (events/day)" : "Hourly buckets (events/hour)"}</span>
+                    <span>End: {chartSeries[chartSeries.length - 1]?.label ?? "—"}</span>
                   </div>
                 </>
               )}
@@ -241,45 +337,6 @@ export function PoolAnalyticsPanel() {
               )}
             </div>
           </div>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Protocol event counts
-              </h3>
-              <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                {analytics.protocolEventCounts.length === 0 ? (
-                  <li className="text-slate-500">No indexed protocol events yet.</li>
-                ) : null}
-                {analytics.protocolEventCounts.map((a) => (
-                  <li key={a.event} className="flex justify-between border-b border-slate-800/60 py-1">
-                    <span>{a.event}</span>
-                    <span className="tabular-nums text-slate-400">{a.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent liquidations</h3>
-              <ul className="mt-3 max-h-56 space-y-2 overflow-auto text-xs text-slate-400">
-                {analytics.liquidationRecords.length === 0 ? (
-                  <li className="text-slate-500">No liquidation records.</li>
-                ) : null}
-                {analytics.liquidationRecords.map((r) => (
-                  <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
-                    {fmtTime(r.created_at)} · borrower {shortAddress(r.user_address)} · liquidator{" "}
-                    {shortAddress(r.counterparty_address)} · repay {fmtAmountBaseUnits(r.amount_base_units, "Liquidate")} ·{" "}
-                    <button
-                      type="button"
-                      onClick={() => void copyTxHash(r.tx_hash)}
-                      className="text-cyan-400/90 hover:text-cyan-300"
-                    >
-                      Copy tx
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
           <div className="mt-8">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent protocol activity</h3>
             <ul className="mt-3 max-h-72 space-y-2 overflow-auto text-xs text-slate-400">
@@ -288,6 +345,11 @@ export function PoolAnalyticsPanel() {
               ) : null}
               {analytics.recentProtocolActivity.map((r) => (
                 <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
+                  {r.event_name === "Liquidate" ? (
+                    <span className="mr-1 rounded border border-rose-500/40 bg-rose-500/10 px-1 text-[10px] text-rose-300">
+                      LIQ
+                    </span>
+                  ) : null}
                   {fmtTime(r.created_at)} · {r.event_name} · user {shortAddress(r.user_address)} · amt{" "}
                   {fmtAmountBaseUnits(r.amount_base_units, r.event_name)} ·{" "}
                   <button

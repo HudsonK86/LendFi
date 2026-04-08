@@ -358,23 +358,7 @@ export function PoolClient() {
         subtitle="Supply USDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
       />
 
-      <div className={card}>
-        <p className={label}>Contract addresses</p>
-        <div className="mt-3 grid gap-2 text-sm text-slate-300">
-          <p>
-            LendingPool <code className={code}>{lendingPoolAddress || "missing env"}</code>
-          </p>
-          <p>
-            USDT <code className={code}>{usdtAddress || "missing env"}</code>
-          </p>
-          <p>
-            FRToken <code className={code}>{frTokenAddress || "missing env"}</code>
-          </p>
-          <p>
-            Price oracle <code className={code}>{usdtOracleAddress || "missing env"}</code>
-          </p>
-        </div>
-      </div>
+      <PoolAnalyticsPanel />
 
       {!mounted ? (
         <p className="mt-8 text-sm text-slate-500">Loading wallet…</p>
@@ -559,8 +543,6 @@ export function PoolClient() {
       {isConnected ? (
         <LiquidationPanel className={`${card} mt-6`} />
       ) : null}
-
-      <PoolAnalyticsPanel />
 
       {!ready ? (
         <p className="mt-8 text-sm text-red-400">
