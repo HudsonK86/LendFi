@@ -42,14 +42,10 @@ export async function GET(request: NextRequest) {
       ORDER BY COUNT(*) DESC
       `,
     );
-
     return NextResponse.json({
       recentActions: recent.rows,
       actionCounts: actionCounts.rows.map((r) => ({ action: r.action, count: Number(r.count) })),
-      liquidationRecords: [],
-      apySnapshots: [],
-      utilizationSnapshots: [],
-      notes: "Off-chain analytics are DB-backed support data; on-chain is source of truth.",
+      notes: "Admin logs are DB-backed support data; on-chain protocol analytics are shown on Pool.",
     });
   } catch (error) {
     console.error("admin analytics error", error);

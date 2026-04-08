@@ -9,12 +9,23 @@ import { card } from "@/lib/ui";
 type AnalyticsResponse = {
   recentActions: AdminActionLog[];
   actionCounts: Array<{ action: string; count: number }>;
-  liquidationRecords: unknown[];
-  apySnapshots: unknown[];
-  utilizationSnapshots: unknown[];
   notes: string;
   error?: string;
 };
+
+function fmtTime(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
 
 export function AdminAnalyticsPanel() {
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
@@ -63,7 +74,7 @@ export function AdminAnalyticsPanel() {
   return (
     <section className={`${card} mt-10`}>
       <h2 className="text-base font-semibold text-slate-100">Historical analytics</h2>
-      <p className="mt-1 text-xs text-slate-500">PostgreSQL — admin action logs and placeholders.</p>
+      <p className="mt-1 text-xs text-slate-500">PostgreSQL-backed admin logs.</p>
       {!analytics ? (
         <p className="mt-4 text-sm text-slate-500">{analyticsError ? "Unable to load." : "Loading…"}</p>
       ) : (
@@ -90,15 +101,12 @@ export function AdminAnalyticsPanel() {
                 {analytics.recentActions.length === 0 ? <li>No recent actions.</li> : null}
                 {analytics.recentActions.map((r) => (
                   <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
-                    {r.created_at} · {r.username} · {r.action}
+                    {fmtTime(r.created_at)} · {r.username} · {r.action}
                   </li>
                 ))}
               </ul>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-600">
-            Liquidation records / APY snapshots are placeholders until dedicated tables exist.
-          </p>
         </>
       )}
     </section>

@@ -17,6 +17,7 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { LiquidationPanel } from "@/components/LiquidationPanel";
 import { StatTile } from "@/components/StatTile";
+import { PoolAnalyticsPanel } from "./PoolAnalyticsPanel";
 import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI, MockUSDT_ABI } from "@/lib/abi";
 import { getLiquidationScanAddresses } from "@/lib/liquidation-scan-addresses";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
@@ -558,6 +559,8 @@ export function PoolClient() {
       {isConnected ? (
         <LiquidationPanel className={`${card} mt-6`} />
       ) : null}
+
+      <PoolAnalyticsPanel />
 
       {!ready ? (
         <p className="mt-8 text-sm text-red-400">
