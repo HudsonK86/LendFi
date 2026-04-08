@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { toast } from "react-toastify";
 
 import { btnPrimary, input, label } from "@/lib/ui";
 
@@ -10,12 +11,10 @@ export function AdminLoginForm() {
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/admin/login", {
@@ -25,12 +24,15 @@ export function AdminLoginForm() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? "Login failed");
+        const msg = data.error ?? "Login failed";
+        toast.error(msg);
         return;
       }
       const from = searchParams.get("from");
       router.push(from && from.startsWith("/admin") ? from : "/admin");
       router.refresh();
+    } catch {
+      toast.error("Login failed");
     } finally {
       setLoading(false);
     }
@@ -69,7 +71,6 @@ export function AdminLoginForm() {
             required
           />
         </label>
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
           {loading ? "Signing in…" : "Sign in"}
         </button>

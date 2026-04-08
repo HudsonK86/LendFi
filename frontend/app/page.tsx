@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LIQUIDATION_THRESHOLD_BPS } from "@/lib/protocol-params";
 import { btnNeutral, btnPrimary, card, cn, label, linkSubtle, shell } from "@/lib/ui";
 
 export default function HomePage() {
@@ -52,7 +53,7 @@ export default function HomePage() {
           <p>
             The protocol uses <strong className="text-slate-300">USDT</strong> as the borrow asset and <strong className="text-slate-300">ETH</strong> as collateral, with
             parameters and risk rules enforced by smart contracts. The interface follows the same patterns as leading lending protocols — pool liquidity,
-            utilization-based rates, health factor, and liquidations — in a single-market layout.
+            utilization-based rates, position health (debt vs collateral), and liquidations — in a single-market layout.
           </p>
         </div>
       </section>
@@ -82,7 +83,10 @@ export default function HomePage() {
             <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-slate-400">
               <li>You send ETH to the contract as <strong className="text-slate-300">collateral</strong> (like a security deposit).</li>
               <li>You can borrow USDT up to a <strong className="text-slate-300">maximum loan-to-value</strong> — you can’t borrow more than your collateral safely allows.</li>
-              <li>Your position has a <strong className="text-slate-300">health factor</strong>: if it gets too low, you can be liquidated.</li>
+              <li>
+                The app shows <strong className="text-slate-300">position health</strong> as debt versus collateral value — if debt goes above the liquidation line (
+                {LIQUIDATION_THRESHOLD_BPS / 100}%), you can be liquidated.
+              </li>
               <li>You repay USDT over time; interest accrues on what you owe.</li>
             </ul>
             <div className="mt-4">
@@ -116,8 +120,8 @@ export default function HomePage() {
             },
             {
               step: "4",
-              title: "Watch health & repay",
-              body: "Keep your health factor above 1. Repay USDT to reduce debt, or add collateral. If health drops too low, liquidators can act.",
+              title: "Watch position health & repay",
+              body: `Keep debt at or below ${LIQUIDATION_THRESHOLD_BPS / 100}% of your collateral value (USDT). Repay USDT to reduce debt, or add collateral. If you cross the line, liquidators can act.`,
             },
             {
               step: "5",
@@ -159,8 +163,8 @@ export default function HomePage() {
               def: "ETH you lock so the protocol can seize it if you don’t pay — it backs your loan.",
             },
             {
-              term: "Health factor",
-              def: "A simple safety score for your loan. Below 1 means you’re underwater and can be liquidated.",
+              term: "Position health",
+              def: `Your current debt (including interest) as a share of your collateral’s value in USDT. Above the ${LIQUIDATION_THRESHOLD_BPS / 100}% liquidation line means you can be liquidated.`,
             },
             {
               term: "Allowance",
@@ -201,7 +205,7 @@ export default function HomePage() {
           },
           {
             title: "Risk is visible",
-            body: "Health factor and pool stats are shown on Borrow and Dashboard so you can see where you stand.",
+            body: "Debt vs collateral and pool stats are shown on Borrow and Dashboard so you can see where you stand.",
           },
           {
             title: "Configurable deployment",

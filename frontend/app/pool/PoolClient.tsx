@@ -246,12 +246,12 @@ export function PoolClient() {
     return sum;
   }, [liquidationScanRead.data, scanAddresses]);
 
-  const totalBorrowedHfLt1 = useMemo(
+  const totalBorrowedLiquidatable = useMemo(
     () => eligibleUnderwaterRows.reduce((acc, r) => acc + r.debt, 0n),
     [eligibleUnderwaterRows],
   );
 
-  const totalEthBlockedHfLt1 = useMemo(
+  const totalEthBlockedLiquidatable = useMemo(
     () => eligibleUnderwaterRows.reduce((acc, r) => acc + r.coll, 0n),
     [eligibleUnderwaterRows],
   );
@@ -397,19 +397,19 @@ export function PoolClient() {
           />
           <StatTile label="Supply APY (%)" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
           <StatTile
-            label="Total borrowed, HF < 1 (USDT)"
+            label="Total borrowed, liquidatable (est.) (USDT)"
             value={
               liquidationScanRead.isPending && !liquidationScanRead.data
                 ? "—"
-                : fmt(totalBorrowedHfLt1)
+                : fmt(totalBorrowedLiquidatable)
             }
           />
           <StatTile
-            label="Total ETH blocked, HF < 1 (ETH)"
+            label="ETH blocked, liquidatable (est.) (ETH)"
             value={
               liquidationScanRead.isPending && !liquidationScanRead.data
                 ? "—"
-                : fmtEthWei(totalEthBlockedHfLt1)
+                : fmtEthWei(totalEthBlockedLiquidatable)
             }
           />
           <StatTile
@@ -509,8 +509,6 @@ export function PoolClient() {
               </button>
             )}
           </div>
-          {approveError ? <p className="mt-2 text-sm text-red-400">{approveError.message}</p> : null}
-          {depositError ? <p className="mt-2 text-sm text-red-400">{depositError.message}</p> : null}
         </section>
       </div>
 
@@ -542,7 +540,6 @@ export function PoolClient() {
             {isWithdrawPending || withdrawReceipt.isLoading ? "Withdrawing…" : "Withdraw"}
           </button>
         </div>
-        {withdrawError ? <p className="mt-2 text-sm text-red-400">{withdrawError.message}</p> : null}
       </section>
 
       {isConnected ? (

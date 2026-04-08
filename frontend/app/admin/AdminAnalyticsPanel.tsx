@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 
 import type { AdminActionLog } from "@/lib/types";
 import { card } from "@/lib/ui";
@@ -18,6 +19,7 @@ type AnalyticsResponse = {
 export function AdminAnalyticsPanel() {
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const lastToastedError = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -50,13 +52,20 @@ export function AdminAnalyticsPanel() {
     };
   }, []);
 
+  useEffect(() => {
+    if (analyticsError && analyticsError !== lastToastedError.current) {
+      lastToastedError.current = analyticsError;
+      toast.error(analyticsError);
+    }
+    if (!analyticsError) lastToastedError.current = null;
+  }, [analyticsError]);
+
   return (
     <section className={`${card} mt-10`}>
       <h2 className="text-base font-semibold text-slate-100">Historical analytics</h2>
       <p className="mt-1 text-xs text-slate-500">PostgreSQL — admin action logs and placeholders.</p>
-      {analyticsError ? <p className="mt-3 text-sm text-red-400">{analyticsError}</p> : null}
       {!analytics ? (
-        <p className="mt-4 text-sm text-slate-500">{analyticsError ? null : "Loading…"}</p>
+        <p className="mt-4 text-sm text-slate-500">{analyticsError ? "Unable to load." : "Loading…"}</p>
       ) : (
         <>
           <p className="mt-3 text-sm text-slate-400">{analytics.notes}</p>

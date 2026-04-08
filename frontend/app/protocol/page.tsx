@@ -19,7 +19,7 @@ import { card, linkSubtle, shell, tableWrap, td, th } from "@/lib/ui";
 export const metadata: Metadata = {
   title: "How LendFi works · LendFi",
   description:
-    "Plain-language guide to interest rates, health factor, borrowing limits, and liquidations on LendFi.",
+    "Plain-language guide to interest rates, position health (debt vs collateral), borrowing limits, and liquidations on LendFi.",
 };
 
 function ParamTable({
@@ -75,7 +75,7 @@ export default function ProtocolPage() {
           ["#interest", "How interest adds up"],
           ["#oracle", "ETH price"],
           ["#borrow-cap", "How much you can borrow"],
-          ["#hf", "Health factor"],
+          ["#position-health", "Position health"],
           ["#liquidation", "Liquidation"],
           ["#fr", "Pool shares (FR)"],
           ["#examples", "Examples"],
@@ -128,9 +128,9 @@ export default function ProtocolPage() {
                 note: "You can’t owe more than this share of your collateral’s value in USDT terms.",
               },
               {
-                name: "Liquidation line (in health factor)",
+                name: "Liquidation line (debt vs collateral)",
                 value: `${LIQUIDATION_THRESHOLD_BPS / 100}%`,
-                note: "Used to calculate health factor — not the same as the max loan above.",
+                note: "If your current debt exceeds this share of your collateral’s value (USDT), your position can be liquidated — not the same as the max loan above.",
               },
               {
                 name: "Liquidation bonus",
@@ -214,8 +214,8 @@ export default function ProtocolPage() {
         <h2 className="text-lg font-semibold text-slate-100">How interest adds up</h2>
         <div className={`${card} mt-4 space-y-4 text-sm leading-relaxed text-slate-400`}>
           <p>
-            Interest isn’t calculated every second on its own. When you borrow, repay, or change your position, the protocol updates your debt using the{" "}
-            <strong className="text-slate-200">current</strong> pool usage and borrow rate.
+            Interest accrues over time based on how long you’ve owed and the borrow rate. When you borrow, repay, or change your position, the protocol settles
+            your debt using the <strong className="text-slate-200">current</strong> pool usage and borrow rate.
           </p>
           <p>
             Part of new interest increases what you owe; a small part ({RESERVE_FACTOR_BPS / 100}%) goes to protocol reserves. The rate can change over time as
@@ -234,7 +234,7 @@ export default function ProtocolPage() {
           <p>
             <strong className="text-slate-200">Example:</strong> you hold <strong className="text-slate-300">2 ETH</strong> and the price is{" "}
             <strong className="text-slate-300">2,000 USDT per ETH</strong>. Your collateral is treated as worth <strong className="text-slate-300">4,000 USDT</strong>{" "}
-            for limits and health factor.
+            for borrow limits and position health.
           </p>
         </div>
       </section>
@@ -254,19 +254,21 @@ export default function ProtocolPage() {
         </div>
       </section>
 
-      <section id="hf" className="mt-12 scroll-mt-24">
-        <h2 className="text-lg font-semibold text-slate-100">Health factor</h2>
+      <section id="position-health" className="mt-12 scroll-mt-24">
+        <h2 className="text-lg font-semibold text-slate-100">Position health</h2>
         <div className={`${card} mt-4 space-y-4 text-sm leading-relaxed text-slate-400`}>
           <p>
-            A single number that shows how safe your loan is. <strong className="text-slate-200">Above 1.0</strong> is safer;{" "}
-            <strong className="text-slate-200">below 1.0</strong> means you can be liquidated.
+            The app shows how your <strong className="text-slate-200">current debt</strong> (USDT, including accrued interest) compares to your{" "}
+            <strong className="text-slate-200">collateral value</strong> (your ETH priced in USDT). Think of it as{" "}
+            <strong className="text-slate-200">debt ÷ collateral value</strong> — a percentage.
           </p>
           <p>
-            It compares your collateral (with a <strong className="text-slate-200">{LIQUIDATION_THRESHOLD_BPS / 100}%</strong> safety margin) to what you owe.
-            That {LIQUIDATION_THRESHOLD_BPS / 100}% is <em>not</em> the same as the {MAX_LTV_BPS / 100}% borrow cap — they answer different questions.
+            The protocol’s <strong className="text-slate-200">liquidation line</strong> is <strong className="text-slate-200">{LIQUIDATION_THRESHOLD_BPS / 100}%</strong>: if
+            your debt is <em>greater than</em> that fraction of your collateral value, you can be liquidated. That {LIQUIDATION_THRESHOLD_BPS / 100}% line is{" "}
+            <em>not</em> the same as the {MAX_LTV_BPS / 100}% borrow cap — you start lower, and interest can push you toward the line over time.
           </p>
           <p>
-            If you have <strong className="text-slate-200">no debt</strong>, the app treats your health as effectively “infinite” (nothing to worry about).
+            If you have <strong className="text-slate-200">no debt</strong>, there’s nothing to liquidate — the app shows 0% debt versus collateral.
           </p>
         </div>
       </section>
@@ -275,9 +277,9 @@ export default function ProtocolPage() {
         <h2 className="text-lg font-semibold text-slate-100">Liquidation</h2>
         <div className={`${card} mt-4 space-y-4 text-sm leading-relaxed text-slate-400`}>
           <p>
-            If your health factor drops <strong className="text-slate-200">below 1.0</strong>, anyone can repay part of your USDT debt and receive some of your
-            ETH. They get a <strong className="text-slate-200">{LIQUIDATION_BONUS_BPS / 100}%</strong> incentive on top of a fair exchange — that’s the
-            liquidation bonus.
+            If your debt rises <strong className="text-slate-200">above {LIQUIDATION_THRESHOLD_BPS / 100}%</strong> of your collateral value (USDT), anyone can
+            repay part of your USDT debt and receive some of your ETH. They get a{" "}
+            <strong className="text-slate-200">{LIQUIDATION_BONUS_BPS / 100}%</strong> incentive on top of a fair exchange — that’s the liquidation bonus.
           </p>
           <p>
             They can’t repay more than you owe, and they can’t take more ETH than you still have locked.
@@ -306,11 +308,12 @@ export default function ProtocolPage() {
         <h2 className="text-lg font-semibold text-slate-100">Quick examples</h2>
         <div className={`${card} mt-4 space-y-6 text-sm leading-relaxed text-slate-400`}>
           <div>
-            <h3 className="font-medium text-slate-200">Health factor</h3>
+            <h3 className="font-medium text-slate-200">Position health</h3>
             <p className="mt-2">
               Say ETH is worth <strong className="text-slate-300">2,000 USDT</strong> each, you deposited <strong className="text-slate-300">1 ETH</strong> as
-              collateral, and you owe <strong className="text-slate-300">1,000 USDT</strong>. Your collateral is worth <strong className="text-slate-300">2,000 USDT</strong>.
-              The protocol’s math puts your health factor <strong className="text-slate-300">above 1.0</strong> — you’re not in the liquidation zone.
+              collateral, and you owe <strong className="text-slate-300">1,000 USDT</strong>. Your collateral is worth <strong className="text-slate-300">2,000 USDT</strong>,
+              so your debt is <strong className="text-slate-300">50%</strong> of collateral value — below the <strong className="text-slate-300">{LIQUIDATION_THRESHOLD_BPS / 100}%</strong>{" "}
+              liquidation line, so you’re not in the liquidation zone.
             </p>
           </div>
           <div>

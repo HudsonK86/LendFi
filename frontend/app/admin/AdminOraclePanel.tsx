@@ -61,21 +61,6 @@ export function AdminOraclePanel() {
   const currentRaw = priceRead.data as bigint | undefined;
   const currentHuman = currentRaw != null ? formatUnits(currentRaw, 18) : null;
 
-  function onSetPrice() {
-    if (!canWrite || !oracleAddress) return;
-    try {
-      const newPrice = BigInt(nextPrice.trim());
-      writeContract({
-        abi: MockPriceOracle_ABI,
-        address: oracleAddress,
-        functionName: "setPrice",
-        args: [newPrice],
-      });
-    } catch {
-      // handled below
-    }
-  }
-
   const parsedPrice = useMemo(() => {
     try {
       return nextPrice.trim() ? BigInt(nextPrice.trim()) : null;
@@ -83,6 +68,20 @@ export function AdminOraclePanel() {
       return null;
     }
   }, [nextPrice]);
+
+  function onSetPrice() {
+    if (!canWrite || !oracleAddress) return;
+    if (!parsedPrice) {
+      if (nextPrice.trim()) toast.error("Price must be a valid integer string.");
+      return;
+    }
+    writeContract({
+      abi: MockPriceOracle_ABI,
+      address: oracleAddress,
+      functionName: "setPrice",
+      args: [parsedPrice],
+    });
+  }
 
   return (
     <section className="mt-8 rounded-xl border border-amber-500/25 bg-amber-950/20 p-6 shadow-lg shadow-amber-950/20 backdrop-blur-sm">
@@ -139,7 +138,7 @@ export function AdminOraclePanel() {
         </label>
         <button
           type="button"
-          disabled={!canWrite || !parsedPrice || isWriting || isConfirming}
+          disabled={!canWrite || isWriting || isConfirming}
           onClick={onSetPrice}
           className={btnPrimary}
         >
@@ -153,10 +152,6 @@ export function AdminOraclePanel() {
           restart the dev server.
         </p>
       ) : null}
-      {!parsedPrice && nextPrice.trim() ? (
-        <p className="mt-3 text-sm text-red-400">Price must be a valid integer string.</p>
-      ) : null}
-      {writeError ? <p className="mt-3 text-sm text-red-400">{writeError.message}</p> : null}
       {hash ? (
         <p className="mt-3 text-sm text-slate-400">
           Tx <code className={code}>{hash}</code>

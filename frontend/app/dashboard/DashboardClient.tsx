@@ -7,11 +7,14 @@ import { useAccount, useReadContract } from "wagmi";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI } from "@/lib/abi";
+import { debtToCollateralRatioBps, formatBpsAsPercent, isDebtAboveLiquidationLine } from "@/lib/protocol-params";
 import { card, code, shell, tableWrap, td, th } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtOracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as `0x${string}` | undefined;
 const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` | undefined;
+
+const BORROWER_POSITION_REFETCH_MS = 10_000;
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
@@ -118,32 +121,53 @@ export function DashboardClient() {
     address: lendingPoolAddress,
     functionName: "collateralETH",
     args: connectedAddress ? [connectedAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
+    query: {
+      enabled: Boolean(lendingPoolAddress && connectedAddress),
+      refetchInterval: BORROWER_POSITION_REFETCH_MS,
+    },
   });
   const borrowerDebt = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
-    functionName: "debtUSDT",
+    functionName: "getDebtValue",
     args: connectedAddress ? [connectedAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
+    query: {
+      enabled: Boolean(lendingPoolAddress && connectedAddress),
+      refetchInterval: BORROWER_POSITION_REFETCH_MS,
+    },
+  });
+  const borrowerCollateralValue = useReadContract({
+    abi: LendingPool_ABI,
+    address: lendingPoolAddress,
+    functionName: "getCollateralValue",
+    args: connectedAddress ? [connectedAddress] : undefined,
+    query: {
+      enabled: Boolean(lendingPoolAddress && connectedAddress),
+      refetchInterval: BORROWER_POSITION_REFETCH_MS,
+    },
   });
   const borrowerMaxBorrow = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "getMaxBorrow",
     args: connectedAddress ? [connectedAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
+    query: {
+      enabled: Boolean(lendingPoolAddress && connectedAddress),
+      refetchInterval: BORROWER_POSITION_REFETCH_MS,
+    },
   });
-  const borrowerHF = useReadContract({
-    abi: LendingPool_ABI,
-    address: lendingPoolAddress,
-    functionName: "getHealthFactor",
-    args: connectedAddress ? [connectedAddress] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && connectedAddress) },
-  });
-
   const canRender = mounted && isAddress(String(lendingPoolAddress)) && isAddress(String(frTokenAddress));
-  const isLiquidatable = ((borrowerHF.data as bigint | undefined) ?? 0n) < 10n ** 18n;
+
+  const borrowerDebtVal = borrowerDebt.data as bigint | undefined;
+  const borrowerCollateralVal = borrowerCollateralValue.data as bigint | undefined;
+  const borrowerDebtRatioBps = useMemo(() => {
+    if (borrowerDebtVal == null || borrowerCollateralVal == null) return undefined;
+    return debtToCollateralRatioBps(borrowerDebtVal, borrowerCollateralVal);
+  }, [borrowerDebtVal, borrowerCollateralVal]);
+  const isLiquidatable = useMemo(() => {
+    if (borrowerDebtVal == null || borrowerCollateralVal == null) return false;
+    return isDebtAboveLiquidationLine(borrowerDebtVal, borrowerCollateralVal);
+  }, [borrowerDebtVal, borrowerCollateralVal]);
 
   const oracleRaw = oraclePrice.data as bigint | undefined;
   const oracleHuman = oracleRaw != null ? formatUnits(oracleRaw, 18) : null;
@@ -214,7 +238,7 @@ export function DashboardClient() {
                   Same wallet as above — collateral, debt, and health for this address.
                 </>
               ) : (
-                "Connect your wallet to see collateral, debt, and health factor."
+                "Connect your wallet to see collateral, debt, and position health."
               )}
             </p>
             <div className={`${tableWrap} mt-6`}>
@@ -222,9 +246,9 @@ export function DashboardClient() {
                 <thead className="border-b border-slate-800 bg-slate-950/50">
                   <tr>
                     <th className={th}>Collateral ETH</th>
-                    <th className={th}>Debt USDT</th>
+                    <th className={th}>Current debt USDT</th>
                     <th className={th}>Max borrow</th>
-                    <th className={th}>Health factor</th>
+                    <th className={th}>Debt ÷ collateral</th>
                     <th className={th}>Liquidatable</th>
                   </tr>
                 </thead>
@@ -233,7 +257,9 @@ export function DashboardClient() {
                     <td className={`${td} tabular-nums`}>{fmt(borrowerCollateral.data as bigint | undefined)}</td>
                     <td className={`${td} tabular-nums`}>{fmt(borrowerDebt.data as bigint | undefined)}</td>
                     <td className={`${td} tabular-nums`}>{fmt(borrowerMaxBorrow.data as bigint | undefined)}</td>
-                    <td className={`${td} tabular-nums`}>{fmt(borrowerHF.data as bigint | undefined, 18, 3)}</td>
+                    <td className={`${td} tabular-nums`}>
+                      {borrowerDebtRatioBps != null ? formatBpsAsPercent(Number(borrowerDebtRatioBps), 2) : "—"}
+                    </td>
                     <td className={td}>
                       {connectedAddress ? (
                         <span className={isLiquidatable ? "font-medium text-red-400" : "font-medium text-emerald-400/90"}>

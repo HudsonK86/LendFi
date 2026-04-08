@@ -8,7 +8,7 @@ export const BPS_DENOMINATOR = 10_000;
 /** Max debt (principal + accrued) as % of collateral value — borrow ceiling */
 export const MAX_LTV_BPS = 7000;
 
-/** Used inside health factor (not the same as max borrow LTV) */
+/** Liquidation when debt exceeds this fraction of collateral value (not the same as max borrow LTV) */
 export const LIQUIDATION_THRESHOLD_BPS = 8000;
 
 /** Extra collateral value liquidator receives vs strict “fair” seizure (5%) */
@@ -28,6 +28,22 @@ export const WAD = 10n ** 18n;
 
 /** HF below this (1.0 in WAD) → liquidatable */
 export const HF_ONE = 10n ** 18n;
+
+/**
+ * Current debt as a fraction of collateral value, in bps (10_000 = 100%).
+ * Uses the same USDT-valued debt and collateral as the pool’s risk checks.
+ */
+export function debtToCollateralRatioBps(debt: bigint, collateralValueUsdt: bigint): bigint | undefined {
+  if (collateralValueUsdt === 0n) return undefined;
+  return (debt * BigInt(BPS_DENOMINATOR)) / collateralValueUsdt;
+}
+
+/** Same liquidation line as the contract: debt above LIQUIDATION_THRESHOLD_BPS of collateral value. */
+export function isDebtAboveLiquidationLine(debt: bigint, collateralValueUsdt: bigint): boolean {
+  if (debt === 0n) return false;
+  if (collateralValueUsdt === 0n) return true;
+  return debt * BigInt(BPS_DENOMINATOR) > collateralValueUsdt * BigInt(LIQUIDATION_THRESHOLD_BPS);
+}
 
 /**
  * Same logic as `LendingPool._computeBorrowAPY(utilBps)` (returns APY in bps).

@@ -15,12 +15,21 @@ import {
 
 import { PageHeader } from "@/components/PageHeader";
 import { LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
+import {
+  LIQUIDATION_THRESHOLD_BPS,
+  debtToCollateralRatioBps,
+  formatBpsAsPercent,
+  isDebtAboveLiquidationLine,
+} from "@/lib/protocol-params";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { StatTile } from "@/components/StatTile";
 import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
 const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
+
+/** RPC refresh for time-dependent debt / health reads; interest accrues per second on-chain. */
+const POSITION_REFETCH_MS = 10_000;
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
@@ -32,31 +41,43 @@ function fmtWalletNativeEth(data?: { value: bigint; decimals: number }) {
   return `${Number(formatUnits(data.value, data.decimals)).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`;
 }
 
-function hfLabel(hf?: bigint) {
-  if (hf == null) return { text: "—", barColor: "bg-slate-600", textClass: "text-slate-400" };
-  const n = Number(formatUnits(hf, 18));
-  if (n < 1) return { text: n.toFixed(3), barColor: "bg-red-500", textClass: "text-red-400" };
-  if (n < 1.25) return { text: n.toFixed(3), barColor: "bg-amber-400", textClass: "text-amber-300" };
-  return { text: n.toFixed(3), barColor: "bg-emerald-400", textClass: "text-emerald-300" };
-}
+function DebtVsCollateralPanel({
+  debt,
+  collateralValueUsdt,
+}: {
+  debt?: bigint;
+  collateralValueUsdt?: bigint;
+}) {
+  const ratioBps =
+    debt != null && collateralValueUsdt != null ? debtToCollateralRatioBps(debt, collateralValueUsdt) : undefined;
+  const unhealthy =
+    debt != null && collateralValueUsdt != null && isDebtAboveLiquidationLine(debt, collateralValueUsdt);
+  const fillPct =
+    ratioBps != null ? Math.min(100, Number(ratioBps) / 100) : 0;
+  const linePct = LIQUIDATION_THRESHOLD_BPS / 100;
+  const pctLabel = ratioBps != null ? formatBpsAsPercent(Number(ratioBps), 2) : "—";
 
-function HealthFactorBar({ hf }: { hf?: bigint }) {
-  const n = hf == null ? 0 : Number(formatUnits(hf, 18));
-  const pct = Math.min(100, Math.max(0, (n / 2) * 100));
-  const hfStyle = hfLabel(hf);
   return (
     <div>
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>Risk meter (0–2 scale)</span>
-        <span className={hfStyle.textClass}>HF {hfStyle.text}</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+      <p className="text-xs text-slate-500">Debt ÷ collateral value (USDT)</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${unhealthy ? "text-red-400" : "text-emerald-400/90"}`}>
+        {pctLabel}
+      </p>
+      <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
         <div
-          className={`h-full rounded-full transition-all ${hfStyle.barColor}`}
-          style={{ width: `${pct}%` }}
+          className={`h-full rounded-full transition-all ${unhealthy ? "bg-red-500" : "bg-emerald-500/90"}`}
+          style={{ width: `${fillPct}%` }}
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 top-0 w-px bg-amber-400/90"
+          style={{ left: `${linePct}%` }}
+          title="80% liquidation line"
         />
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">&lt;1 liquidatable · ≥1.25 safer buffer</p>
+      <p className="mt-2 text-[11px] leading-snug text-slate-500">
+        Unhealthy when debt is over {LIQUIDATION_THRESHOLD_BPS / 100}% of collateral value — same line the pool uses for
+        liquidation.
+      </p>
     </div>
   );
 }
@@ -95,56 +116,49 @@ export function BorrowClient() {
     address: lendingPoolAddress,
     functionName: "collateralETH",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && address) },
+    query: { enabled: Boolean(lendingPoolAddress && address), refetchInterval: POSITION_REFETCH_MS },
   });
   const debtRead = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "debtUSDT",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && address) },
-  });
-  const hfRead = useReadContract({
-    abi: LendingPool_ABI,
-    address: lendingPoolAddress,
-    functionName: "getHealthFactor",
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && address) },
+    query: { enabled: Boolean(lendingPoolAddress && address), refetchInterval: POSITION_REFETCH_MS },
   });
   const maxBorrowRead = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "getMaxBorrow",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && address) },
+    query: { enabled: Boolean(lendingPoolAddress && address), refetchInterval: POSITION_REFETCH_MS },
   });
   const collateralValueRead = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "getCollateralValue",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && address) },
+    query: { enabled: Boolean(lendingPoolAddress && address), refetchInterval: POSITION_REFETCH_MS },
   });
   const debtValueRead = useReadContract({
     abi: LendingPool_ABI,
     address: lendingPoolAddress,
     functionName: "getDebtValue",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(lendingPoolAddress && address) },
+    query: { enabled: Boolean(lendingPoolAddress && address), refetchInterval: POSITION_REFETCH_MS },
   });
   const usdtAllowanceRead = useReadContract({
     abi: MockUSDT_ABI,
     address: usdtAddress,
     functionName: "allowance",
     args: address && lendingPoolAddress ? [address, lendingPoolAddress] : undefined,
-    query: { enabled: Boolean(address && lendingPoolAddress && usdtAddress) },
+    query: { enabled: Boolean(address && lendingPoolAddress && usdtAddress), refetchInterval: POSITION_REFETCH_MS },
   });
   const usdtWalletRead = useReadContract({
     abi: MockUSDT_ABI,
     address: usdtAddress,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && usdtAddress) },
+    query: { enabled: Boolean(address && usdtAddress), refetchInterval: POSITION_REFETCH_MS },
   });
 
   const depositCollateralTx = useWriteContract();
@@ -257,8 +271,6 @@ export function BorrowClient() {
   const borrowTooHigh = Boolean(parsedBorrow && maxBorrow != null && parsedBorrow > maxBorrow);
   const repayNeedsApprove =
     parsedRepay != null && (usdtAllowanceRead.data as bigint | undefined ?? 0n) < parsedRepay;
-  const hf = hfLabel(hfRead.data as bigint | undefined);
-
   const hasPosition =
     (collateralRead.data as bigint | undefined ?? 0n) > 0n ||
     (debtRead.data as bigint | undefined ?? 0n) > 0n;
@@ -267,7 +279,7 @@ export function BorrowClient() {
     <main className={shell}>
       <PageHeader
         title="Borrow"
-        subtitle="Deposit ETH collateral, borrow USDT against it, and keep health factor above 1 to avoid liquidation."
+        subtitle="Deposit ETH collateral, borrow USDT against it, and keep debt at or below 80% of your collateral value (USDT) to avoid liquidation."
       />
 
       {!mounted ? (
@@ -291,9 +303,9 @@ export function BorrowClient() {
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <StatTile label="Collateral (ETH)" value={fmt(collateralRead.data as bigint | undefined)} />
               <StatTile
-                label="Debt (USDT)"
+                label="Current debt (USDT)"
                 value={fmt(debtValueRead.data as bigint | undefined, usdtDecimals)}
-                hint="Includes accrued interest"
+                hint="Total owed, including accrued interest"
               />
               <StatTile label="Max borrow (USDT)" value={fmt(maxBorrow, usdtDecimals)} />
               <StatTile label="Collateral value (USDT)" value={fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)} />
@@ -302,10 +314,12 @@ export function BorrowClient() {
             </div>
           </div>
           <div className="w-full shrink-0 lg:max-w-xs">
-            <p className={label}>Health factor</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${hf.textClass}`}>{hf.text}</p>
-            <div className="mt-4">
-              <HealthFactorBar hf={hfRead.data as bigint | undefined} />
+            <p className={label}>Position health</p>
+            <div className="mt-2">
+              <DebtVsCollateralPanel
+                debt={debtValueRead.data as bigint | undefined}
+                collateralValueUsdt={collateralValueRead.data as bigint | undefined}
+              />
             </div>
           </div>
         </div>
@@ -374,7 +388,9 @@ export function BorrowClient() {
               {borrowTx.isPending || borrowReceipt.isLoading ? "Borrowing…" : "Borrow"}
             </button>
           </div>
-          {borrowTooHigh ? <p className="mt-2 text-sm text-red-400">Amount exceeds max borrow.</p> : null}
+          {borrowTooHigh ? (
+            <p className="mt-2 text-sm text-slate-500">Amount exceeds max borrow (see Max borrow above).</p>
+          ) : null}
         </section>
 
         <section className={card}>
@@ -455,14 +471,6 @@ export function BorrowClient() {
           </div>
         </section>
       </div>
-
-      {depositCollateralTx.error ? (
-        <p className="mt-4 text-sm text-red-400">{depositCollateralTx.error.message}</p>
-      ) : null}
-      {borrowTx.error ? <p className="mt-2 text-sm text-red-400">{borrowTx.error.message}</p> : null}
-      {approveTx.error ? <p className="mt-2 text-sm text-red-400">{approveTx.error.message}</p> : null}
-      {repayTx.error ? <p className="mt-2 text-sm text-red-400">{repayTx.error.message}</p> : null}
-      {withdrawTx.error ? <p className="mt-2 text-sm text-red-400">{withdrawTx.error.message}</p> : null}
 
       {!ready ? (
         <p className="mt-8 text-sm text-red-400">

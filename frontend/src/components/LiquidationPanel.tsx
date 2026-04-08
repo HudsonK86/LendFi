@@ -241,8 +241,6 @@ export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
         )}
       </div>
 
-      {approveTx.error ? <p className="mt-3 text-sm text-red-400">{approveTx.error.message}</p> : null}
-      {liquidateTx.error ? <p className="mt-3 text-sm text-red-400">{liquidateTx.error.message}</p> : null}
     </section>
   );
 }
