@@ -56,3 +56,17 @@ CREATE TABLE IF NOT EXISTS pool_activity (
     CONSTRAINT pool_activity_unique_log
       UNIQUE (chain_id, contract_address, tx_hash, log_index)
 );
+
+-- Periodic market snapshots (oracle + FR NAV) for charting.
+CREATE TABLE IF NOT EXISTS pool_market_snapshots (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chain_id              INT    NOT NULL,
+    block_number          BIGINT NOT NULL,
+    oracle_price_base_units NUMERIC NOT NULL, -- getPrice() from MockPriceOracle (18 decimals)
+    fr_nav_base_units     NUMERIC NOT NULL,   -- USDT per 1 FR (18-decimal fixed-point)
+    observed_at           TIMESTAMPTZ NOT NULL,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT pool_market_snapshots_unique_block
+      UNIQUE (chain_id, block_number)
+);

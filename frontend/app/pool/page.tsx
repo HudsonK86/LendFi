@@ -1,5 +1,5 @@
-import { PoolClient } from "./PoolClient";
+import { PoolPageClient } from "./PoolPageClient";
 
 export default function PoolPage() {
-  return <PoolClient mode="analyticsOnly" />;
+  return <PoolPageClient />;
 }

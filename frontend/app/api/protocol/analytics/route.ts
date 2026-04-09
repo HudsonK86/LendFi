@@ -25,6 +25,12 @@ type HourlyActivityRow = {
   count: string;
 };
 
+type MarketSeriesRow = {
+  bucket: string;
+  oracle_price_base_units: string;
+  fr_nav_base_units: string;
+};
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -88,6 +94,18 @@ export async function GET(request: Request) {
       ORDER BY ${bucketExpr} ASC
       `,
     );
+    const marketSeries = await query<MarketSeriesRow>(
+      `
+      SELECT
+        to_char(${bucketExpr}, '${formatMask}') AS bucket,
+        AVG(oracle_price_base_units)::text AS oracle_price_base_units,
+        AVG(fr_nav_base_units)::text AS fr_nav_base_units
+      FROM pool_market_snapshots
+      WHERE observed_at >= NOW() - ${intervalSql}
+      GROUP BY ${bucketExpr}
+      ORDER BY ${bucketExpr} ASC
+      `,
+    );
 
     return NextResponse.json({
       protocolEventCounts: protocolEventCounts.rows.map((r) => ({
@@ -100,8 +118,13 @@ export async function GET(request: Request) {
         hour: r.bucket,
         count: Number(r.count),
       })),
+      marketSeries: marketSeries.rows.map((r) => ({
+        hour: r.bucket,
+        oraclePriceBaseUnits: r.oracle_price_base_units,
+        frNavBaseUnits: r.fr_nav_base_units,
+      })),
       range,
-      notes: "Protocol analytics from indexed on-chain events.",
+      notes: "Protocol analytics from indexed on-chain events and market snapshots.",
     });
   } catch (error) {
     console.error("protocol analytics error", error);

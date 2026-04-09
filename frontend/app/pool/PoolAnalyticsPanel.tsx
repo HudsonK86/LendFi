@@ -27,6 +27,7 @@ type ProtocolAnalyticsResponse = {
     created_at: string;
   }>;
   hourlyActivity: Array<{ hour: string; count: number }>;
+  marketSeries: Array<{ hour: string; oraclePriceBaseUnits: string; frNavBaseUnits: string }>;
   range: "24h" | "7d";
   notes: string;
   error?: string;
@@ -54,6 +55,7 @@ function compactBucketLabel(value: string): string {
 }
 
 type SeriesPoint = { label: string; count: number };
+type PricePoint = { label: string; oracle: number; fr: number };
 
 function buildSeries(hourly: Array<{ hour: string; count: number }>, range: "24h" | "7d"): SeriesPoint[] {
   const now = new Date();
@@ -87,6 +89,48 @@ function buildSeries(hourly: Array<{ hour: string; count: number }>, range: "24h
 function linePath(points: { x: number; y: number }[]): string {
   if (points.length === 0) return "";
   return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+}
+
+function parseFixed18(value: string): number {
+  try {
+    return Number(BigInt(value)) / 1e18;
+  } catch {
+    return 0;
+  }
+}
+
+function fmtCompact(value: number, digits = 6): string {
+  if (!Number.isFinite(value)) return "—";
+  return value.toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function buildPriceSeries(
+  marketSeries: Array<{ hour: string; oraclePriceBaseUnits: string; frNavBaseUnits: string }>,
+  range: "24h" | "7d",
+): PricePoint[] {
+  const activityBuckets = buildSeries(
+    marketSeries.map((p) => ({ hour: p.hour, count: 0 })),
+    range,
+  ).map((b) => b.label);
+  const byLabel = new Map(
+    marketSeries.map((p) => [
+      compactBucketLabel(p.hour),
+      {
+        oracle: parseFixed18(p.oraclePriceBaseUnits),
+        fr: parseFixed18(p.frNavBaseUnits),
+      },
+    ]),
+  );
+
+  const raw = activityBuckets.map((label) => {
+    const point = byLabel.get(label);
+    return {
+      label,
+      oracle: point?.oracle ?? 0,
+      fr: point?.fr ?? 0,
+    };
+  });
+  return raw;
 }
 
 function shortAddress(v: string | null | undefined): string {
@@ -227,6 +271,12 @@ export function PoolAnalyticsPanel() {
   const filteredActivity = (analytics?.recentProtocolActivity ?? []).filter((r) =>
     selectedEvents.includes(r.event_name),
   );
+  const priceSeries = analytics ? buildPriceSeries(analytics.marketSeries ?? [], analytics.range) : [];
+  const maxOracle = priceSeries.reduce((m, p) => Math.max(m, p.oracle), 0);
+  const maxFr = priceSeries.reduce((m, p) => Math.max(m, p.fr), 0);
+  const latestMarket = analytics?.marketSeries?.[analytics.marketSeries.length - 1];
+  const latestOraclePrice = latestMarket ? parseFixed18(latestMarket.oraclePriceBaseUnits) : undefined;
+  const latestFrNav = latestMarket ? parseFixed18(latestMarket.frNavBaseUnits) : undefined;
 
   if (!mounted) {
     return (
@@ -376,6 +426,140 @@ export function PoolAnalyticsPanel() {
                 </ul>
               )}
             </div>
+          </div>
+          <div className="mt-6 rounded-lg border border-slate-800/80 bg-slate-950/40 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Oracle & FR NAV trends ({analytics.range === "7d" ? "by day" : "by hour"})
+            </h3>
+            <p className="mt-1 text-[11px] text-slate-500">Separate charts with their own scale for clearer value movement.</p>
+            {priceSeries.length === 0 || (maxOracle === 0 && maxFr === 0) ? (
+              <p className="mt-3 text-xs text-slate-500">No market snapshot data yet. Keep indexer running to build price history.</p>
+            ) : (
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-md border border-slate-800/80 bg-slate-950/40 p-2">
+                  <p className="mb-2 text-[11px] text-slate-500">Oracle price (USDT/ETH)</p>
+                  <svg viewBox="0 0 1000 280" className="h-64 w-full">
+                    {[0, 25, 50, 75, 100].map((g) => (
+                      <line
+                        key={g}
+                        x1="40"
+                        x2="980"
+                        y1={20 + ((100 - g) / 100) * 180}
+                        y2={20 + ((100 - g) / 100) * 180}
+                        stroke="rgba(148,163,184,0.18)"
+                        strokeWidth="1"
+                      />
+                    ))}
+                    {(() => {
+                      const left = 40;
+                      const width = 940;
+                      const top = 20;
+                      const height = 210;
+                      const scaleMax = Math.max(1, maxOracle);
+                      const yTicks = [0, 25, 50, 75, 100].map((g) => ({
+                        y: top + ((100 - g) / 100) * height,
+                        v: (scaleMax * g) / 100,
+                      }));
+                      const points = priceSeries.map((p, i) => ({
+                        x: left + (priceSeries.length === 1 ? 0 : (i / (priceSeries.length - 1)) * width),
+                        y: top + (1 - p.oracle / scaleMax) * height,
+                        label: p.label,
+                        value: p.oracle,
+                      }));
+                      const xLabelLeft = points[0]?.label ?? "—";
+                      const xLabelMid = points[Math.floor(points.length / 2)]?.label ?? "—";
+                      const xLabelRight = points[points.length - 1]?.label ?? "—";
+                      return (
+                        <>
+                          {yTicks.map((t) => (
+                            <text key={`oy-${t.y}`} x="4" y={t.y + 5} fill="rgba(148,163,184,0.9)" fontSize="12">
+                              {fmtCompact(t.v, 2)}
+                            </text>
+                          ))}
+                          <path d={linePath(points)} fill="none" stroke="rgb(14,165,233)" strokeWidth="2.5" />
+                          {points.map((p) => (
+                            <g key={`o-${p.label}`}>
+                              <circle cx={p.x} cy={p.y} r="2.4" fill="rgb(14,165,233)" />
+                              <title>{`${p.label} Oracle: ${p.value.toFixed(6)} USDT/ETH`}</title>
+                            </g>
+                          ))}
+                          <text x={left} y="268" fill="rgba(148,163,184,0.9)" fontSize="12">
+                            {xLabelLeft}
+                          </text>
+                          <text x={left + width / 2 - 30} y="268" fill="rgba(148,163,184,0.9)" fontSize="12">
+                            {xLabelMid}
+                          </text>
+                          <text x={left + width - 60} y="268" fill="rgba(148,163,184,0.9)" fontSize="12">
+                            {xLabelRight}
+                          </text>
+                        </>
+                      );
+                    })()}
+                  </svg>
+                </div>
+                <div className="rounded-md border border-slate-800/80 bg-slate-950/40 p-2">
+                  <p className="mb-2 text-[11px] text-slate-500">FR NAV (USDT)</p>
+                  <svg viewBox="0 0 1000 280" className="h-64 w-full">
+                    {[0, 25, 50, 75, 100].map((g) => (
+                      <line
+                        key={g}
+                        x1="40"
+                        x2="980"
+                        y1={20 + ((100 - g) / 100) * 180}
+                        y2={20 + ((100 - g) / 100) * 180}
+                        stroke="rgba(148,163,184,0.18)"
+                        strokeWidth="1"
+                      />
+                    ))}
+                    {(() => {
+                      const left = 40;
+                      const width = 940;
+                      const top = 20;
+                      const height = 210;
+                      const scaleMax = Math.max(1, maxFr);
+                      const yTicks = [0, 25, 50, 75, 100].map((g) => ({
+                        y: top + ((100 - g) / 100) * height,
+                        v: (scaleMax * g) / 100,
+                      }));
+                      const points = priceSeries.map((p, i) => ({
+                        x: left + (priceSeries.length === 1 ? 0 : (i / (priceSeries.length - 1)) * width),
+                        y: top + (1 - p.fr / scaleMax) * height,
+                        label: p.label,
+                        value: p.fr,
+                      }));
+                      const xLabelLeft = points[0]?.label ?? "—";
+                      const xLabelMid = points[Math.floor(points.length / 2)]?.label ?? "—";
+                      const xLabelRight = points[points.length - 1]?.label ?? "—";
+                      return (
+                        <>
+                          {yTicks.map((t) => (
+                            <text key={`fy-${t.y}`} x="4" y={t.y + 5} fill="rgba(148,163,184,0.9)" fontSize="12">
+                              {fmtCompact(t.v, 4)}
+                            </text>
+                          ))}
+                          <path d={linePath(points)} fill="none" stroke="rgb(16,185,129)" strokeWidth="2.5" />
+                          {points.map((p) => (
+                            <g key={`f-${p.label}`}>
+                              <circle cx={p.x} cy={p.y} r="2.4" fill="rgb(16,185,129)" />
+                              <title>{`${p.label} FR NAV: ${p.value.toFixed(8)} USDT`}</title>
+                            </g>
+                          ))}
+                          <text x={left} y="268" fill="rgba(148,163,184,0.9)" fontSize="12">
+                            {xLabelLeft}
+                          </text>
+                          <text x={left + width / 2 - 30} y="268" fill="rgba(148,163,184,0.9)" fontSize="12">
+                            {xLabelMid}
+                          </text>
+                          <text x={left + width - 60} y="268" fill="rgba(148,163,184,0.9)" fontSize="12">
+                            {xLabelRight}
+                          </text>
+                        </>
+                      );
+                    })()}
+                  </svg>
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-8">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent protocol activity</h3>

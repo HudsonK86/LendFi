@@ -5,7 +5,9 @@ config();
 import { createPublicClient, decodeEventLog, http, Log } from "viem";
 import { hardhat } from "viem/chains";
 
+import { FRToken_ABI } from "../src/lib/abi/FRToken";
 import { LendingPool_ABI } from "../src/lib/abi/LendingPool";
+import { MockPriceOracle_ABI } from "../src/lib/abi/MockPriceOracle";
 import { getPool } from "../src/lib/db";
 
 type PoolActivityArgs = {
@@ -119,6 +121,8 @@ async function indexOnce(): Promise<boolean> {
   const lendingPoolAddress = (await getEnv(
     "NEXT_PUBLIC_LENDING_POOL_ADDRESS",
   )) as `0x${string}`;
+  const frTokenAddress = (await getEnv("NEXT_PUBLIC_FRTOKEN_ADDRESS")) as `0x${string}`;
+  const oracleAddress = (await getEnv("NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS")) as `0x${string}`;
 
   const client = createPublicClient({
     chain: hardhat,
@@ -223,6 +227,49 @@ async function indexOnce(): Promise<boolean> {
         console.error("Failed to index one log entry", e);
       }
     }
+  }
+
+  // Snapshot market state for this indexed block range so analytics can chart prices over time.
+  try {
+    const [oraclePrice, poolValue, frTotalSupply, block] = await Promise.all([
+      client.readContract({
+        address: oracleAddress,
+        abi: MockPriceOracle_ABI,
+        functionName: "getPrice",
+      }) as Promise<bigint>,
+      client.readContract({
+        address: lendingPoolAddress,
+        abi: LendingPool_ABI,
+        functionName: "getPoolValue",
+      }) as Promise<bigint>,
+      client.readContract({
+        address: frTokenAddress,
+        abi: FRToken_ABI,
+        functionName: "totalSupply",
+      }) as Promise<bigint>,
+      client.getBlock({ blockNumber: toBlock }),
+    ]);
+
+    const oneFr = 10n ** 18n;
+    const frNav = frTotalSupply > 0n ? (poolValue * oneFr) / frTotalSupply : 0n;
+    const observedAt = new Date(Number(block.timestamp) * 1000).toISOString();
+
+    await pool.query(
+      `
+      INSERT INTO pool_market_snapshots (
+        chain_id,
+        block_number,
+        oracle_price_base_units,
+        fr_nav_base_units,
+        observed_at
+      )
+      VALUES ($1, $2, $3, $4, $5::timestamptz)
+      ON CONFLICT (chain_id, block_number) DO NOTHING
+      `,
+      [chainId, toBlock.toString(), oraclePrice.toString(), frNav.toString(), observedAt],
+    );
+  } catch (e) {
+    console.error("Failed to write pool_market_snapshots row", e);
   }
 
   await setLastIndexedBlock(toBlock);
