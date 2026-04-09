@@ -1,5 +1,5 @@
-import { BorrowPageClient } from "./BorrowPageClient";
+import { redirect } from "next/navigation";
 
 export default function BorrowPage() {
-  return <BorrowPageClient />;
+  redirect("/dashboard");
 }

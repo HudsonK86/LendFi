@@ -27,7 +27,7 @@ export default function HomePage() {
           <Link href="/pool" className={btnPrimary}>
             I want to supply
           </Link>
-          <Link href="/borrow" className={btnNeutral}>
+          <Link href="/dashboard" className={btnNeutral}>
             I want to borrow
           </Link>
           <Link href="/dashboard" className={cn(btnNeutral, "border-transparent bg-transparent hover:bg-slate-800/50")}>
@@ -90,8 +90,8 @@ export default function HomePage() {
               <li>You repay USDT over time; interest accrues on what you owe.</li>
             </ul>
             <div className="mt-4">
-              <Link href="/borrow" className={linkSubtle}>
-                Go to Borrow →
+              <Link href="/dashboard" className={linkSubtle}>
+                Go to Dashboard →
               </Link>
             </div>
           </article>

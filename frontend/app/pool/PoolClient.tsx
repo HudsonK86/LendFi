@@ -66,7 +66,12 @@ function asBigint(row: MulticallRow | undefined): bigint | undefined {
   return typeof r === "bigint" ? r : undefined;
 }
 
-export function PoolClient() {
+type PoolClientProps = {
+  embedded?: boolean;
+  mode?: "full" | "analyticsOnly" | "modulesOnly";
+};
+
+export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps) {
   const [actionTab, setActionTab] = useState<"deposit" | "withdraw" | "liquidate">("deposit");
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawFrAmount, setWithdrawFrAmount] = useState("");
@@ -368,13 +373,27 @@ export function PoolClient() {
     Boolean(isAddress(String(usdtAddress))) &&
     Boolean(isAddress(String(frTokenAddress))) &&
     Boolean(isAddress(String(lendingPoolAddress)));
+  const showMarket = mode !== "modulesOnly";
+  const showAnalytics = mode !== "modulesOnly";
+  const showModules = mode !== "analyticsOnly";
 
   return (
-    <main className={shell}>
-      <PageHeader
-        title="Pool"
-        subtitle="Supply USDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
-      />
+    <main className={embedded ? "w-full" : shell}>
+      {!embedded ? (
+        <PageHeader
+          title="Pool"
+          subtitle={
+            mode === "analyticsOnly"
+              ? "Protocol activity analytics and market-level pool stats."
+              : "Supply USDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
+          }
+        />
+      ) : (
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-slate-100">Pool module</h2>
+          <p className="text-sm text-slate-400">Supply, withdraw, and monitor pool-level analytics.</p>
+        </div>
+      )}
 
       {!mounted ? (
         <p className="mt-8 text-sm text-slate-500">Loading wallet…</p>
@@ -387,7 +406,7 @@ export function PoolClient() {
         </div>
       ) : null}
 
-      <section className="mt-8">
+      {showMarket ? <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Total supplied (USDT)" value={fmt(totalSupplied.data as bigint | undefined)} hint="In pool" />
@@ -443,11 +462,11 @@ export function PoolClient() {
             }
           />
         </div>
-      </section>
+      </section> : null}
 
-      <PoolAnalyticsPanel />
+      {showAnalytics ? <PoolAnalyticsPanel /> : null}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      {showModules ? <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className={card}>
           <h2 className="text-base font-semibold text-slate-100">Your balances</h2>
           <div className="mt-4 grid gap-3 text-sm">
@@ -606,7 +625,7 @@ export function PoolClient() {
             </div>
           ) : null}
         </section>
-      </div>
+      </div> : null}
 
       {!ready ? (
         <p className="mt-8 text-sm text-red-400">
@@ -616,14 +635,16 @@ export function PoolClient() {
         </p>
       ) : null}
 
-      <div className="mt-10 flex flex-wrap gap-4 text-sm">
-        <Link href="/" className="text-cyan-400/90 hover:text-cyan-300">
-          ← Home
-        </Link>
-        <Link href="/borrow" className="text-cyan-400/90 hover:text-cyan-300">
-          Borrow →
-        </Link>
-      </div>
+      {!embedded ? (
+        <div className="mt-10 flex flex-wrap gap-4 text-sm">
+          <Link href="/" className="text-cyan-400/90 hover:text-cyan-300">
+            ← Home
+          </Link>
+          <Link href="/dashboard" className="text-cyan-400/90 hover:text-cyan-300">
+            Dashboard →
+          </Link>
+        </div>
+      ) : null}
     </main>
   );
 }

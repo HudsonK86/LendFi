@@ -1,5 +1,5 @@
 import { PoolClient } from "./PoolClient";
 
 export default function PoolPage() {
-  return <PoolClient />;
+  return <PoolClient mode="analyticsOnly" />;
 }

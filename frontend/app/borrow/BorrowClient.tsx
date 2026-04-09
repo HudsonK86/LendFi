@@ -82,7 +82,11 @@ function DebtVsCollateralPanel({
   );
 }
 
-export function BorrowClient() {
+type BorrowClientProps = {
+  embedded?: boolean;
+};
+
+export function BorrowClient({ embedded = false }: BorrowClientProps) {
   const [mounted, setMounted] = useState(false);
   const [collateralEth, setCollateralEth] = useState("");
   const [borrowUsdt, setBorrowUsdt] = useState("");
@@ -276,11 +280,18 @@ export function BorrowClient() {
     (debtRead.data as bigint | undefined ?? 0n) > 0n;
 
   return (
-    <main className={shell}>
-      <PageHeader
-        title="Borrow"
-        subtitle="Deposit ETH collateral, borrow USDT against it, and keep debt at or below 80% of your collateral value (USDT) to avoid liquidation."
-      />
+    <main className={embedded ? "w-full" : shell}>
+      {!embedded ? (
+        <PageHeader
+          title="Borrow"
+          subtitle="Deposit ETH collateral, borrow USDT against it, and keep debt at or below 80% of your collateral value (USDT) to avoid liquidation."
+        />
+      ) : (
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-slate-100">Borrow module</h2>
+          <p className="text-sm text-slate-400">Manage collateral, debt, and repayment in one panel.</p>
+        </div>
+      )}
 
       {!mounted ? (
         <p className="text-sm text-slate-500">Loading wallet…</p>
@@ -479,14 +490,16 @@ export function BorrowClient() {
         </p>
       ) : null}
 
-      <div className="mt-10 flex flex-wrap gap-4 text-sm">
-        <Link href="/pool" className="text-cyan-400/90 hover:text-cyan-300">
-          ← Pool
-        </Link>
-        <Link href="/dashboard" className="text-cyan-400/90 hover:text-cyan-300">
-          Dashboard →
-        </Link>
-      </div>
+      {!embedded ? (
+        <div className="mt-10 flex flex-wrap gap-4 text-sm">
+          <Link href="/pool" className="text-cyan-400/90 hover:text-cyan-300">
+            ← Pool
+          </Link>
+          <Link href="/dashboard" className="text-cyan-400/90 hover:text-cyan-300">
+            Dashboard →
+          </Link>
+        </div>
+      ) : null}
     </main>
   );
 }
