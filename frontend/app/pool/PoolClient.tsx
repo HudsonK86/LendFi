@@ -429,12 +429,12 @@ export function PoolClient({
       {showMarket ? <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Total supplied (USDT)" value={fmt(totalSupplied.data as bigint | undefined)} hint="In pool" />
-          <StatTile label="Total borrowed (USDT)" value={fmt(totalBorrowed.data as bigint | undefined)} />
-          <StatTile label="Available liquidity (USDT)" value={fmt(availableLiquidity.data as bigint | undefined)} />
+          <StatTile label="Supplied (USDT)" value={fmt(totalSupplied.data as bigint | undefined)} hint="In pool" />
+          <StatTile label="Borrowed (USDT)" value={fmt(totalBorrowed.data as bigint | undefined)} />
+          <StatTile label="Liquidity (USDT)" value={fmt(availableLiquidity.data as bigint | undefined)} />
           <StatTile label="Reserves (USDT)" value={fmt(totalReserves.data as bigint | undefined)} />
           <StatTile
-            label="Total ETH blocked (ETH)"
+            label="Blocked ETH (ETH)"
             value={
               liquidationScanRead.isPending && !liquidationScanRead.data
                 ? "—"
@@ -443,15 +443,15 @@ export function PoolClient({
                   : "—"
             }
           />
-          <StatTile label="Utilization (%)" value={fmtPctBps(utilization.data as bigint | undefined)} />
+          <StatTile label="Utilization" value={fmtPctBps(utilization.data as bigint | undefined)} />
           <StatTile
-            label="Borrow APY (%)"
+            label="Borrow APY"
             value={fmtPctBps(borrowApy.data as bigint | undefined)}
             hint="Variable from model"
           />
-          <StatTile label="Supply APY (%)" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
+          <StatTile label="Supply APY" value={fmtPctBps(supplyApy.data as bigint | undefined)} />
           <StatTile
-            label="Total borrowed, liquidatable (est.) (USDT)"
+            label="At-risk debt (USDT)"
             value={
               liquidationScanRead.isPending && !liquidationScanRead.data
                 ? "—"
@@ -459,25 +459,22 @@ export function PoolClient({
             }
           />
           <StatTile
-            label="ETH blocked, liquidatable (est.) (ETH)"
+            label="Liquidatable ETH (ETH)"
             value={
               liquidationScanRead.isPending && !liquidationScanRead.data
                 ? "—"
                 : fmtEthWei(totalEthBlockedLiquidatable)
             }
           />
+          <StatTile label="Oracle (USDT/ETH)" value={oracleRaw != null ? `${fmt(oracleRaw, 18, ORACLE_DISPLAY_DIGITS)}` : "—"} />
           <StatTile
-            label="ETH / USDT oracle"
-            value={oracleRaw != null ? `${fmt(oracleRaw, 18, ORACLE_DISPLAY_DIGITS)} USDT/ETH` : "—"}
-          />
-          <StatTile
-            label="FR / USDT (NAV)"
-            value={frUsdtNav != null ? `${fmt(frUsdtNav, decimals, NAV_DISPLAY_DIGITS)} USDT` : "—"}
+            label="FR NAV (USDT)"
+            value={frUsdtNav != null ? `${fmt(frUsdtNav, decimals, NAV_DISPLAY_DIGITS)}` : "—"}
             hint={
               (frTotalSupply.data as bigint | undefined) === 0n
                 ? "No FR supply yet"
                 : frUsdtNav != null
-                  ? "USDT per 1 FR; same as burning 1 FR via withdrawLiquidity"
+                  ? "USDT per 1 FR"
                   : undefined
             }
           />
