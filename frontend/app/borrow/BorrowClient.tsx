@@ -84,9 +84,21 @@ function DebtVsCollateralPanel({
 
 type BorrowClientProps = {
   embedded?: boolean;
+  hideWalletStats?: boolean;
+  focusAction?: "deposit" | "borrow" | "repay" | "withdraw";
+  hideEmbeddedHeader?: boolean;
+  hidePositionSection?: boolean;
+  actionHint?: string;
 };
 
-export function BorrowClient({ embedded = false }: BorrowClientProps) {
+export function BorrowClient({
+  embedded = false,
+  hideWalletStats = false,
+  focusAction,
+  hideEmbeddedHeader = false,
+  hidePositionSection = false,
+  actionHint,
+}: BorrowClientProps) {
   const [mounted, setMounted] = useState(false);
   const [collateralEth, setCollateralEth] = useState("");
   const [borrowUsdt, setBorrowUsdt] = useState("");
@@ -278,6 +290,10 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
   const hasPosition =
     (collateralRead.data as bigint | undefined ?? 0n) > 0n ||
     (debtRead.data as bigint | undefined ?? 0n) > 0n;
+  const showDeposit = !focusAction || focusAction === "deposit";
+  const showBorrow = !focusAction || focusAction === "borrow";
+  const showRepay = !focusAction || focusAction === "repay";
+  const showWithdraw = !focusAction || focusAction === "withdraw";
 
   return (
     <main className={embedded ? "w-full" : shell}>
@@ -286,12 +302,12 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
           title="Borrow"
           subtitle="Deposit ETH collateral, borrow USDT against it, and keep debt at or below 80% of your collateral value (USDT) to avoid liquidation."
         />
-      ) : (
+      ) : !hideEmbeddedHeader ? (
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-slate-100">Borrow module</h2>
           <p className="text-sm text-slate-400">Manage collateral, debt, and repayment in one panel.</p>
         </div>
-      )}
+      ) : null}
 
       {!mounted ? (
         <p className="text-sm text-slate-500">Loading wallet…</p>
@@ -304,7 +320,7 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
         </div>
       ) : null}
 
-      <section className={`${card} mt-8`}>
+      {!hidePositionSection ? <section className={`${card} mt-8`}>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold text-slate-100">Your position</h2>
@@ -320,8 +336,10 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
               />
               <StatTile label="Max borrow (USDT)" value={fmt(maxBorrow, usdtDecimals)} />
               <StatTile label="Collateral value (USDT)" value={fmt(collateralValueRead.data as bigint | undefined, usdtDecimals)} />
-              <StatTile label="Wallet ETH" value={fmtWalletNativeEth(walletEthBalance)} />
-              <StatTile label="Wallet USDT" value={fmt(usdtWalletRead.data as bigint | undefined, usdtDecimals)} />
+              {!hideWalletStats ? <StatTile label="Wallet ETH" value={fmtWalletNativeEth(walletEthBalance)} /> : null}
+              {!hideWalletStats ? (
+                <StatTile label="Wallet USDT" value={fmt(usdtWalletRead.data as bigint | undefined, usdtDecimals)} />
+              ) : null}
             </div>
           </div>
           <div className="w-full shrink-0 lg:max-w-xs">
@@ -334,11 +352,12 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
             </div>
           </div>
         </div>
-      </section>
+      </section> : null}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section className={card}>
+      <div className={`mt-8 grid gap-6 ${focusAction ? "lg:grid-cols-1" : "lg:grid-cols-2"}`}>
+        {showDeposit ? <section className={card}>
           <h3 className="text-base font-semibold text-slate-100">Deposit ETH collateral</h3>
+          {actionHint ? <p className="mt-1 text-xs text-slate-500">{actionHint}</p> : null}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-sm text-slate-300">
               <span className={label}>Amount (ETH)</span>
@@ -367,13 +386,14 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
               {depositCollateralTx.isPending || depositReceipt.isLoading ? "Depositing…" : "Deposit"}
             </button>
           </div>
-        </section>
+        </section> : null}
 
-        <section className={card}>
+        {showBorrow ? <section className={card}>
           <h3 className="text-base font-semibold text-slate-100">Borrow USDT</h3>
+          {actionHint ? <p className="mt-1 text-xs text-slate-500">{actionHint}</p> : null}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-sm text-slate-300">
-              <span className={label}>Amount</span>
+              <span className={label}>Amount (USDT)</span>
               <input
                 value={borrowUsdt}
                 onChange={(e) => setBorrowUsdt(e.target.value)}
@@ -402,13 +422,14 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
           {borrowTooHigh ? (
             <p className="mt-2 text-sm text-slate-500">Amount exceeds max borrow (see Max borrow above).</p>
           ) : null}
-        </section>
+        </section> : null}
 
-        <section className={card}>
+        {showRepay ? <section className={card}>
           <h3 className="text-base font-semibold text-slate-100">Repay USDT</h3>
+          {actionHint ? <p className="mt-1 text-xs text-slate-500">{actionHint}</p> : null}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-sm text-slate-300">
-              <span className={label}>Amount</span>
+              <span className={label}>Amount (USDT)</span>
               <input
                 value={repayUsdt}
                 onChange={(e) => setRepayUsdt(e.target.value)}
@@ -450,10 +471,11 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
               </button>
             )}
           </div>
-        </section>
+        </section> : null}
 
-        <section className={card}>
+        {showWithdraw ? <section className={card}>
           <h3 className="text-base font-semibold text-slate-100">Withdraw ETH collateral</h3>
+          {actionHint ? <p className="mt-1 text-xs text-slate-500">{actionHint}</p> : null}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-sm text-slate-300">
               <span className={label}>Amount (ETH)</span>
@@ -480,7 +502,7 @@ export function BorrowClient({ embedded = false }: BorrowClientProps) {
               {withdrawTx.isPending || withdrawReceipt.isLoading ? "Withdrawing…" : "Withdraw"}
             </button>
           </div>
-        </section>
+        </section> : null}
       </div>
 
       {!ready ? (

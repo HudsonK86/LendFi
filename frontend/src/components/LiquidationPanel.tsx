@@ -30,9 +30,15 @@ function asBigint(row: MulticallRow | undefined): bigint | undefined {
 type LiquidationPanelProps = {
   /** Extra class for the outer section (default: card shell) */
   className?: string;
+  compact?: boolean;
+  hideDescription?: boolean;
 };
 
-export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
+export function LiquidationPanel({
+  className = card,
+  compact = false,
+  hideDescription = false,
+}: LiquidationPanelProps) {
   const [repayAmount, setRepayAmount] = useState("");
   const queryClient = useQueryClient();
   const processedApproveHash = useRef<`0x${string}` | undefined>(undefined);
@@ -171,10 +177,12 @@ export function LiquidationPanel({ className = card }: LiquidationPanelProps) {
 
   return (
     <section className={className}>
-      <h2 className="text-base font-semibold text-slate-100">Liquidate</h2>
-      <p className="mt-1 text-xs leading-relaxed text-slate-500">
-        Repay underwater debt with your USDT; ETH from collateral (plus liquidation bonus) is sent to your wallet.
-      </p>
+      {!compact ? <h2 className="text-base font-semibold text-slate-100">Liquidate</h2> : null}
+      {!hideDescription ? (
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          Repay underwater debt with your USDT; ETH from collateral (plus liquidation bonus) is sent to your wallet.
+        </p>
+      ) : null}
 
       {poolConfigured ? (
         scanLoading || noLiquidatable ? (

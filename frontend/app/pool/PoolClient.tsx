@@ -69,9 +69,22 @@ function asBigint(row: MulticallRow | undefined): bigint | undefined {
 type PoolClientProps = {
   embedded?: boolean;
   mode?: "full" | "analyticsOnly" | "modulesOnly";
+  hideBalancesCard?: boolean;
+  forcedActionTab?: "deposit" | "withdraw" | "liquidate";
+  hideEmbeddedHeader?: boolean;
+  compactActionOnly?: boolean;
+  actionHint?: string;
 };
 
-export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps) {
+export function PoolClient({
+  embedded = false,
+  mode = "full",
+  hideBalancesCard = false,
+  forcedActionTab,
+  hideEmbeddedHeader = false,
+  compactActionOnly = false,
+  actionHint,
+}: PoolClientProps) {
   const [actionTab, setActionTab] = useState<"deposit" | "withdraw" | "liquidate">("deposit");
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawFrAmount, setWithdrawFrAmount] = useState("");
@@ -90,6 +103,12 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (forcedActionTab) {
+      setActionTab(forcedActionTab);
+    }
+  }, [forcedActionTab]);
 
   const { data: decimalsData } = useReadContract({
     abi: MockUSDT_ABI,
@@ -376,6 +395,7 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
   const showMarket = mode !== "modulesOnly";
   const showAnalytics = mode !== "modulesOnly";
   const showModules = mode !== "analyticsOnly";
+  const showBalancesCard = showModules && !hideBalancesCard;
 
   return (
     <main className={embedded ? "w-full" : shell}>
@@ -388,12 +408,12 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
               : "Supply USDT to earn pool shares (FR). Withdraw by burning FR. Rates move with utilization — similar to a single-market lending view."
           }
         />
-      ) : (
+      ) : !hideEmbeddedHeader ? (
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-slate-100">Pool module</h2>
           <p className="text-sm text-slate-400">Supply, withdraw, and monitor pool-level analytics.</p>
         </div>
-      )}
+      ) : null}
 
       {!mounted ? (
         <p className="mt-8 text-sm text-slate-500">Loading wallet…</p>
@@ -466,8 +486,8 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
 
       {showAnalytics ? <PoolAnalyticsPanel /> : null}
 
-      {showModules ? <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section className={card}>
+      {showModules ? <div className={`${compactActionOnly ? "mt-0" : "mt-8"} grid gap-6 ${showBalancesCard ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+        {showBalancesCard ? <section className={card}>
           <h2 className="text-base font-semibold text-slate-100">Your balances</h2>
           <div className="mt-4 grid gap-3 text-sm">
             <div className="flex justify-between border-b border-slate-800/80 py-2">
@@ -495,11 +515,11 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
               </span>
             </div>
           </div>
-        </section>
+        </section> : null}
 
         <section className={card}>
-          <h2 className="text-base font-semibold text-slate-100">Pool actions</h2>
-          <div className="mt-3 inline-flex rounded-lg border border-slate-800 bg-slate-950/40 p-1 text-xs">
+          {!compactActionOnly ? <h2 className="text-base font-semibold text-slate-100">Pool actions</h2> : null}
+          {!compactActionOnly ? <div className="mt-3 inline-flex rounded-lg border border-slate-800 bg-slate-950/40 p-1 text-xs">
             {(["deposit", "withdraw", "liquidate"] as const).map((tab) => (
               <button
                 key={tab}
@@ -512,14 +532,17 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
                 {tab}
               </button>
             ))}
-          </div>
+          </div> : null}
           {actionTab === "deposit" ? (
             <>
-              <p className="mt-3 text-xs text-slate-500">Approve once if needed, then deposit into the pool.</p>
+              <h3 className="text-base font-semibold text-slate-100">Deposit USDT</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {actionHint ?? "Approve once if needed, then deposit into the pool."}
+              </p>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                 <label className="flex-1 text-sm text-slate-300">
                   <span className={`${label} flex items-center justify-between`}>
-                    <span>Amount</span>
+                    <span>Amount (USDT)</span>
                     <button
                       type="button"
                       className="text-cyan-400/90 hover:text-cyan-300"
@@ -577,11 +600,14 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
 
           {actionTab === "withdraw" ? (
             <>
-              <p className="mt-3 text-xs text-slate-500">Burn FR to withdraw your share of pool USDT.</p>
+              <h3 className="text-base font-semibold text-slate-100">Withdraw USDT</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {actionHint ?? "Burn FR to withdraw your share of pool USDT."}
+              </p>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                 <label className="flex-1 text-sm text-slate-300">
                   <span className={`${label} flex items-center justify-between`}>
-                    <span>FR amount</span>
+                    <span>Amount (FR)</span>
                     <button
                       type="button"
                       className="text-cyan-400/90 hover:text-cyan-300"
@@ -621,7 +647,15 @@ export function PoolClient({ embedded = false, mode = "full" }: PoolClientProps)
 
           {actionTab === "liquidate" ? (
             <div className="mt-4">
-              {isConnected ? <LiquidationPanel className="border-0 bg-transparent p-0 shadow-none" /> : null}
+              <h3 className="text-base font-semibold text-slate-100">Liquidate</h3>
+              {actionHint ? <p className="mt-1 text-xs text-slate-500">{actionHint}</p> : null}
+              {isConnected ? (
+                <LiquidationPanel
+                  className="border-0 bg-transparent p-0 shadow-none"
+                  compact={compactActionOnly}
+                  hideDescription={Boolean(actionHint)}
+                />
+              ) : null}
             </div>
           ) : null}
         </section>
