@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatUnits, isAddress } from "viem";
 import { useAccount, useBalance, useReadContract } from "wagmi";
+import { toast } from "react-toastify";
 
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -34,6 +35,18 @@ export function DashboardClient() {
     "supply" | "withdraw" | "liquidate" | "depositCollateral" | "borrow" | "repay" | "withdrawCollateral"
   >("supply");
   const { address } = useAccount();
+  const [recentTx, setRecentTx] = useState<
+    Array<{
+      id: string;
+      event_name: string;
+      amount_base_units: string | null;
+      tx_hash: string;
+      created_at: string;
+      user_address: string;
+    }>
+  >([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [selectedTxEvents, setSelectedTxEvents] = useState<string[]>([]);
   const { data: walletEthBalance } = useBalance({ address, query: { enabled: Boolean(address) } });
 
   const usdtBalance = useReadContract({
@@ -172,6 +185,126 @@ export function DashboardClient() {
       : tabMeta[tab].group === "Credit"
         ? "border-violet-400/40 bg-violet-500/20 text-violet-100"
         : "border-amber-400/40 bg-amber-500/20 text-amber-100";
+  const txEventOptions = useMemo(() => {
+    return Array.from(new Set(recentTx.map((r) => r.event_name)));
+  }, [recentTx]);
+  const filteredRecentTx = useMemo(() => {
+    if (selectedTxEvents.length === 0) return recentTx;
+    return recentTx.filter((r) => selectedTxEvents.includes(r.event_name));
+  }, [recentTx, selectedTxEvents]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadUserTx() {
+      if (!address || !isAddress(address)) {
+        if (active) setRecentTx([]);
+        return;
+      }
+      setTxLoading(true);
+      try {
+        const res = await fetch(`/api/protocol/user-transactions?address=${address.toLowerCase()}&limit=20`);
+        const data = (await res.json()) as { items?: typeof recentTx };
+        if (!active) return;
+        setRecentTx(data.items ?? []);
+      } catch {
+        if (active) setRecentTx([]);
+      } finally {
+        if (active) setTxLoading(false);
+      }
+    }
+    void loadUserTx();
+    const id = setInterval(() => void loadUserTx(), 5000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [address]);
+
+  useEffect(() => {
+    if (txEventOptions.length === 0) {
+      setSelectedTxEvents([]);
+      return;
+    }
+    setSelectedTxEvents((prev) => prev.filter((e) => txEventOptions.includes(e)));
+  }, [txEventOptions]);
+
+  function humanEventLabel(eventName: string): string {
+    switch (eventName) {
+      case "DepositLiquidity":
+        return "Deposit Liquidity (USDT)";
+      case "WithdrawLiquidity":
+        return "Withdraw Liquidity (USDT)";
+      case "DepositCollateral":
+        return "Deposit Collateral (ETH)";
+      case "WithdrawCollateral":
+        return "Withdraw Collateral (ETH)";
+      case "Borrow":
+        return "Borrow (USDT)";
+      case "Repay":
+        return "Repay (USDT)";
+      case "Liquidate":
+        return "Liquidate Position";
+      default:
+        return eventName;
+    }
+  }
+
+  function shortAddress(v: string | null | undefined): string {
+    if (!v) return "—";
+    return `${v.slice(0, 6)}...${v.slice(-4)}`;
+  }
+
+  function fmtTime(value: string): string {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  }
+
+  function eventUnit(eventName: string): "ETH" | "USDT" | "RAW" {
+    if (eventName === "DepositCollateral" || eventName === "WithdrawCollateral") return "ETH";
+    if (
+      eventName === "DepositLiquidity" ||
+      eventName === "WithdrawLiquidity" ||
+      eventName === "Borrow" ||
+      eventName === "Repay" ||
+      eventName === "Liquidate"
+    ) {
+      return "USDT";
+    }
+    return "RAW";
+  }
+
+  function fmtAmount(base: string | null, eventName: string): string {
+    if (!base) return "—";
+    const unit = eventUnit(eventName);
+    if (unit === "RAW") return base;
+    try {
+      const n = BigInt(base);
+      const whole = n / 10n ** 18n;
+      const frac = (n % 10n ** 18n).toString().padStart(18, "0").slice(0, 4).replace(/0+$/, "");
+      const wholeFmt = Number(whole).toLocaleString("en-US");
+      return frac ? `${wholeFmt}.${frac} ${unit}` : `${wholeFmt} ${unit}`;
+    } catch {
+      return `${base} ${unit}`;
+    }
+  }
+
+  async function copyTxHash(hash: string) {
+    try {
+      await navigator.clipboard.writeText(hash);
+      toast.success("Tx hash copied");
+    } catch {
+      toast.error("Failed to copy tx hash");
+    }
+  }
   return (
     <main className={shell}>
       <PageHeader
@@ -375,6 +508,63 @@ export function DashboardClient() {
           </div>
         </section>
       </div>
+
+      <section className={`${card} mt-8 bg-gradient-to-br from-slate-900/70 to-slate-950/60`}>
+        <h2 className="text-base font-semibold text-slate-100">Recent Transactions</h2>
+        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+          <button
+            type="button"
+            onClick={() => setSelectedTxEvents([])}
+            className={`rounded border px-2 py-1 ${
+              selectedTxEvents.length === 0
+                ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
+                : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            All
+          </button>
+          {txEventOptions.map((eventName) => {
+            const selected = selectedTxEvents.includes(eventName);
+            return (
+              <button
+                key={eventName}
+                type="button"
+                onClick={() =>
+                  setSelectedTxEvents((prev) =>
+                    prev.includes(eventName) ? prev.filter((e) => e !== eventName) : [...prev, eventName],
+                  )
+                }
+                className={`rounded border px-2 py-1 ${
+                  selected
+                    ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
+                    : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {humanEventLabel(eventName)}
+              </button>
+            );
+          })}
+        </div>
+        {txLoading ? <p className="mt-3 text-xs text-slate-500">Loading recent transactions…</p> : null}
+        <ul className="mt-3 max-h-80 space-y-2 overflow-auto text-xs text-slate-400">
+          {filteredRecentTx.length === 0 && !txLoading ? (
+            <li className="text-slate-500">No transactions for this wallet yet.</li>
+          ) : null}
+          {filteredRecentTx.map((r) => (
+            <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
+              {fmtTime(r.created_at)} · {humanEventLabel(r.event_name)} · user {shortAddress(r.user_address)} · amt{" "}
+              {fmtAmount(r.amount_base_units, r.event_name)} ·{" "}
+              <button
+                type="button"
+                onClick={() => void copyTxHash(r.tx_hash)}
+                className="text-cyan-400/90 hover:text-cyan-300"
+              >
+                Copy tx
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }

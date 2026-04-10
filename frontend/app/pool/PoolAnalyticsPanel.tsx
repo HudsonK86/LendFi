@@ -256,21 +256,20 @@ export function PoolAnalyticsPanel() {
   const availableEvents = useMemo(() => eventMix.map((e) => e.event), [eventMix]);
 
   useEffect(() => {
-    if (availableEvents.length === 0) {
-      setSelectedEvents((prev) => (prev.length === 0 ? prev : []));
-      return;
-    }
     setSelectedEvents((prev) => {
-      const kept = prev.filter((e) => availableEvents.includes(e));
-      const next = kept.length > 0 ? kept : [...availableEvents];
+      if (availableEvents.length === 0) {
+        return prev.length === 0 ? prev : [];
+      }
+      const next = prev.filter((e) => availableEvents.includes(e));
       if (next.length === prev.length && next.every((v, i) => v === prev[i])) return prev;
       return next;
     });
   }, [availableEvents]);
 
-  const filteredActivity = (analytics?.recentProtocolActivity ?? []).filter((r) =>
-    selectedEvents.includes(r.event_name),
-  );
+  const filteredActivity =
+    selectedEvents.length === 0
+      ? analytics?.recentProtocolActivity ?? []
+      : (analytics?.recentProtocolActivity ?? []).filter((r) => selectedEvents.includes(r.event_name));
   const priceSeries = analytics ? buildPriceSeries(analytics.marketSeries ?? [], analytics.range) : [];
   const maxOracle = priceSeries.reduce((m, p) => Math.max(m, p.oracle), 0);
   const maxFr = priceSeries.reduce((m, p) => Math.max(m, p.fr), 0);
@@ -566,8 +565,12 @@ export function PoolAnalyticsPanel() {
             <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
               <button
                 type="button"
-                onClick={() => setSelectedEvents([...availableEvents])}
-                className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300 hover:text-slate-100"
+                onClick={() => setSelectedEvents([])}
+                className={`rounded border px-2 py-1 ${
+                  selectedEvents.length === 0
+                    ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
+                    : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200"
+                }`}
               >
                 All
               </button>
