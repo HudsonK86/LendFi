@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import {
@@ -23,6 +23,12 @@ function shortAddress(address?: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+type OracleLogSnapshot = {
+  previousPriceHuman: string;
+  newPriceHuman: string;
+  oracleAddress: `0x${string}`;
+};
+
 export function AdminOraclePanel() {
   const [nextPrice, setNextPrice] = useState("");
   const { address, isConnected } = useAccount();
@@ -30,6 +36,9 @@ export function AdminOraclePanel() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
+  const pendingLogRef = useRef<OracleLogSnapshot | null>(null);
+  const loggedTxHashes = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (isConfirmed) toast.success("Oracle price update confirmed");
   }, [isConfirmed]);
@@ -37,18 +46,58 @@ export function AdminOraclePanel() {
     if (writeError) toast.error(writeError.message);
   }, [writeError]);
 
+  useEffect(() => {
+    if (!isConfirmed || !hash) return;
+    if (loggedTxHashes.current.has(hash)) return;
+    loggedTxHashes.current.add(hash);
+    const snap = pendingLogRef.current;
+    pendingLogRef.current = null;
+    void (async () => {
+      try {
+        const res = await fetch("/api/admin/log", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "set_oracle_price",
+            details: {
+              txHash: hash,
+              oracleAddress: snap?.oracleAddress ?? oracleAddress,
+              previousPriceUsdtPerEth: snap?.previousPriceHuman ?? null,
+              newPriceUsdtPerEth: snap?.newPriceHuman ?? null,
+            },
+          }),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          toast.warn(err.error ?? "Could not save admin audit log (on-chain update still succeeded).");
+        }
+      } catch {
+        toast.warn("Could not save admin audit log (on-chain update still succeeded).");
+      }
+    })();
+  }, [isConfirmed, hash]);
+
   const ownerRead = useReadContract({
     abi: MockPriceOracle_ABI,
     address: oracleAddress,
     functionName: "owner",
     query: { enabled: Boolean(oracleAddress) },
   });
-  const priceRead = useReadContract({
+  const {
+    data: priceData,
+    refetch: refetchPrice,
+  } = useReadContract({
     abi: MockPriceOracle_ABI,
     address: oracleAddress,
     functionName: "getPrice",
     query: { enabled: Boolean(oracleAddress) },
   });
+
+  useEffect(() => {
+    if (!isConfirmed || !hash) return;
+    void refetchPrice();
+  }, [isConfirmed, hash, refetchPrice]);
 
   const authorizedWallet = useMemo(
     () => configuredAdminWallet || (ownerRead.data as `0x${string}` | undefined),
@@ -59,7 +108,7 @@ export function AdminOraclePanel() {
   const canWrite =
     Boolean(oracleAddress) && isConnected && !walletMismatch && isAddress(oracleAddress as string);
 
-  const currentRaw = priceRead.data as bigint | undefined;
+  const currentRaw = priceData as bigint | undefined;
   const currentHuman = currentRaw != null ? formatUnits(currentRaw, PRICE_DECIMALS) : null;
 
   const priceWei = useMemo(() => {
@@ -80,12 +129,18 @@ export function AdminOraclePanel() {
       }
       return;
     }
+    pendingLogRef.current = {
+      previousPriceHuman: currentHuman ?? "",
+      newPriceHuman: nextPrice.trim(),
+      oracleAddress,
+    };
     writeContract({
       abi: MockPriceOracle_ABI,
       address: oracleAddress,
       functionName: "setPrice",
       args: [priceWei],
     });
+    setNextPrice("");
   }
 
   return (

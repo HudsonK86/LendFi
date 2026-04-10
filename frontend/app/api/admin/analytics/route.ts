@@ -6,11 +6,6 @@ import type { AdminActionLog } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-type ActionCountRow = {
-  action: string;
-  count: string;
-};
-
 export async function GET(request: NextRequest) {
   const res = NextResponse.json({});
   let session;
@@ -34,17 +29,8 @@ export async function GET(request: NextRequest) {
       LIMIT 20
       `,
     );
-    const actionCounts = await query<ActionCountRow>(
-      `
-      SELECT action, COUNT(*)::text AS count
-      FROM admin_action_logs
-      GROUP BY action
-      ORDER BY COUNT(*) DESC
-      `,
-    );
     return NextResponse.json({
       recentActions: recent.rows,
-      actionCounts: actionCounts.rows.map((r) => ({ action: r.action, count: Number(r.count) })),
       notes: "Admin logs are DB-backed support data; on-chain protocol analytics are shown on Pool.",
     });
   } catch (error) {

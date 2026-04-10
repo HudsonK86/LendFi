@@ -8,10 +8,24 @@ import { card } from "@/lib/ui";
 
 type AnalyticsResponse = {
   recentActions: AdminActionLog[];
-  actionCounts: Array<{ action: string; count: number }>;
   notes: string;
   error?: string;
 };
+
+function formatOracleLogDetails(action: string, details: string | null): string | null {
+  if (!details || action !== "set_oracle_price") return null;
+  try {
+    const o = JSON.parse(details) as {
+      previousPriceUsdtPerEth?: string;
+      newPriceUsdtPerEth?: string;
+    };
+    const a = o.previousPriceUsdtPerEth ?? "—";
+    const b = o.newPriceUsdtPerEth ?? "—";
+    return `${a} → ${b} USDT/ETH`;
+  } catch {
+    return null;
+  }
+}
 
 function fmtTime(value: string): string {
   const d = new Date(value);
@@ -80,32 +94,22 @@ export function AdminAnalyticsPanel() {
       ) : (
         <>
           <p className="mt-3 text-sm text-slate-400">{analytics.notes}</p>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Action counts</h3>
-              <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                {analytics.actionCounts.length === 0 ? (
-                  <li className="text-slate-500">No actions logged yet.</li>
-                ) : null}
-                {analytics.actionCounts.map((a) => (
-                  <li key={a.action} className="flex justify-between border-b border-slate-800/60 py-1">
-                    <span>{a.action}</span>
-                    <span className="tabular-nums text-slate-400">{a.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent actions</h3>
-              <ul className="mt-3 max-h-56 space-y-2 overflow-auto text-xs text-slate-400">
-                {analytics.recentActions.length === 0 ? <li>No recent actions.</li> : null}
-                {analytics.recentActions.map((r) => (
+          <div className="mt-6">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent actions</h3>
+            <ul className="mt-3 max-h-56 space-y-2 overflow-auto text-xs text-slate-400">
+              {analytics.recentActions.length === 0 ? <li>No recent actions.</li> : null}
+              {analytics.recentActions.map((r) => {
+                const oracleLine = formatOracleLogDetails(r.action, r.details);
+                return (
                   <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
-                    {fmtTime(r.created_at)} · {r.username} · {r.action}
+                    <div>
+                      {fmtTime(r.created_at)} · {r.username} · {r.action}
+                    </div>
+                    {oracleLine ? <div className="mt-1 text-[11px] text-slate-500">{oracleLine}</div> : null}
                   </li>
-                ))}
-              </ul>
-            </div>
+                );
+              })}
+            </ul>
           </div>
         </>
       )}
