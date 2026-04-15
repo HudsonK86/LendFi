@@ -12,10 +12,13 @@ build/
 *.log
 *.tsbuildinfo
 
-# Hardhat caches (avoid committing compilers / build artifacts)
-hardhat/.home/
-hardhat/.cache/
-hardhat/.hardhat-test-cache/
+# Backend Hardhat caches (avoid committing compilers / build artifacts)
+backend/.home/
+backend/.cache/
+backend/.hardhat-test-cache/
+backend/artifacts/
+backend/cache/
+backend/ignition/deployments/
 frontend/.eslintcache/
 
 # OS / editor

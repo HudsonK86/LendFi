@@ -18,15 +18,17 @@ import { PageHeader } from "@/components/PageHeader";
 import { LiquidationPanel } from "@/components/LiquidationPanel";
 import { StatTile } from "@/components/StatTile";
 import { PoolAnalyticsPanel } from "./PoolAnalyticsPanel";
-import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { FRToken_ABI, LendingPool_ABI, MockPriceOracle_ABI, MockUSDT_ABI } from "@/abi";
 import { getLiquidationScanAddresses } from "@/lib/liquidation-scan-addresses";
+import { LIQUIDATION_SCAN_STALE_MS } from "@/lib/polling";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
+import { CONTRACT_ADDRESSES } from "@/utils/smartContractAddress";
 
-const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
-const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
-const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` | undefined;
-const usdtOracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as `0x${string}` | undefined;
+const lendingPoolAddress = CONTRACT_ADDRESSES.lendingPool;
+const usdtAddress = CONTRACT_ADDRESSES.mockUsdt;
+const frTokenAddress = CONTRACT_ADDRESSES.frToken;
+const usdtOracleAddress = CONTRACT_ADDRESSES.mockPriceOracle;
 
 /** USDT amounts from pool (18 decimals in this project). */
 function fmt(value?: bigint, decimals = 18, digits = 4) {
@@ -247,14 +249,14 @@ export function PoolClient({
             },
           ])
         : [],
-    [lendingPoolAddress, scanAddresses],
+    [scanAddresses],
   );
 
   const liquidationScanRead = useReadContracts({
     contracts: liquidationScanContracts,
     query: {
       enabled: Boolean(lendingPoolAddress && liquidationScanContracts.length > 0),
-      staleTime: 12_000,
+      staleTime: LIQUIDATION_SCAN_STALE_MS,
     },
   });
 

@@ -1,5 +1,5 @@
 /**
- * On-chain parameters mirrored from `hardhat/contracts/LendingPool.sol`.
+ * On-chain parameters mirrored from `backend/contracts/LendingPool.sol`.
  * Keep in sync when Solidity constants change.
  */
 

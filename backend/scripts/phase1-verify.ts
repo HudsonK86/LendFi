@@ -1,35 +1,7 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import hre from "hardhat";
 import { decodeEventLog, getEventSelector, parseAbiItem, parseEther } from "viem";
-
-type DeployedAddresses = Record<string, string>;
-
-const CHAIN_ID = 31337;
+import { readDeployedAddressesFromScript, requireDeployedAddress } from "./lib/deployments.js";
 const SECONDS_PER_DAY = 86400;
-
-async function defaultDeployedAddresses(): Promise<DeployedAddresses> {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const deployed = path.join(
-    __dirname,
-    "..",
-    "ignition",
-    "deployments",
-    `chain-${CHAIN_ID}`,
-    "deployed_addresses.json",
-  );
-  const raw = JSON.parse(await fs.readFile(deployed, "utf8")) as DeployedAddresses;
-  return raw;
-}
-
-function addrFromMap(raw: DeployedAddresses, key: string): `0x${string}` {
-  const v = raw[key];
-  if (!v) throw new Error(`Missing deployed address for ${key}`);
-  if (!/^0x[0-9a-fA-F]{40}$/.test(v)) throw new Error(`Invalid address for ${key}: ${v}`);
-  return v as `0x${string}`;
-}
 
 async function main() {
   const connection = await hre.network.connect({ network: "localhost" });
@@ -38,10 +10,10 @@ async function main() {
     const publicClient = await viem.getPublicClient();
     const wallets = await viem.getWalletClients();
 
-    const deployed = await defaultDeployedAddresses();
-    const usdtAddress = addrFromMap(deployed, "MockUSDTModule#MockUSDT");
-    const lendingPoolAddress = addrFromMap(deployed, "LendingPoolModule#LendingPool");
-    const oracleAddress = addrFromMap(deployed, "MockPriceOracleModule#MockPriceOracle");
+    const deployed = await readDeployedAddressesFromScript(import.meta.url);
+    const usdtAddress = requireDeployedAddress(deployed, "MockUSDTModule#MockUSDT");
+    const lendingPoolAddress = requireDeployedAddress(deployed, "LendingPoolModule#LendingPool");
+    const oracleAddress = requireDeployedAddress(deployed, "MockPriceOracleModule#MockPriceOracle");
 
     const lender = wallets[0]; // deposits liquidity
     const borrower = wallets[1]; // deposits collateral, borrows, repays

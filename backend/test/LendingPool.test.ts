@@ -219,15 +219,15 @@ describe("LendingPool", () => {
     expect(diff).to.be.lessThan(1_000_000_000_000n);
   });
 
-  // I. withdrawCollateral blocked — HF below 1
-  it("I. withdrawCollateral reverts when HF would drop below 1", async () => {
+  // I. withdrawCollateral blocked — debt would exceed 80% of collateral value
+  it("I. withdrawCollateral reverts when debt would go above 80% of collateral value", async () => {
     await seedLiquidity();
     const b = wallets[9];
     const poolB = await getAs("LendingPool", pool.address, b);
     await poolB.write.depositCollateral([], { value: 1n * 10n ** 18n });
     await poolB.write.borrow([1400n * 10n ** 18n - 1n]);
     // With 1 ETH collateral and debt close to max LTV, withdrawing a ~13% chunk
-    // should push postCollateral HF below 1e18.
+    // This withdrawal should push post-withdraw debt/collateral above 80%.
     const withdrawAmt = 130n * 10n ** 15n; // 0.13 ETH
     await viem.assertions.revertWith(
       poolB.write.withdrawCollateral([withdrawAmt]),
@@ -235,8 +235,8 @@ describe("LendingPool", () => {
     );
   });
 
-  // J. withdrawCollateral allowed — HF stays ≥ 1
-  it("J. withdrawCollateral succeeds when HF stays >= 1", async () => {
+  // J. withdrawCollateral allowed — debt remains <= 80% of collateral value
+  it("J. withdrawCollateral succeeds when debt stays at or below 80% of collateral value", async () => {
     await seedLiquidity();
     const b = wallets[10];
     const poolB = await getAs("LendingPool", pool.address, b);
@@ -249,8 +249,8 @@ describe("LendingPool", () => {
     expect(collateralAfter).to.equal(collateralBefore - 5n * 10n ** 17n);
   });
 
-  // K. Liquidation blocked — HF >= 1
-  it("K. Liquidation reverts when HF >= 1", async () => {
+  // K. Liquidation blocked — debt <= 80% of collateral value
+  it("K. Liquidation reverts when debt is at or below 80% of collateral value", async () => {
     await seedLiquidity();
     const b = wallets[11];
     const poolB = await getAs("LendingPool", pool.address, b);
@@ -266,15 +266,15 @@ describe("LendingPool", () => {
     );
   });
 
-  // L. Liquidation allowed — HF < 1
-  it("L. Liquidation succeeds when HF < 1", async () => {
+  // L. Liquidation allowed — debt > 80% of collateral value
+  it("L. Liquidation succeeds when debt is above 80% of collateral value", async () => {
     await seedLiquidity();
     const b = wallets[12];
     const poolB = await getAs("LendingPool", pool.address, b);
     const usdtLiquidator = await getAs("MockUSDT", usdt.address, liquidator);
     const poolLiquidator = await getAs("LendingPool", pool.address, liquidator);
     await poolB.write.depositCollateral([], { value: 1n * 10n ** 18n });
-    // Borrow close to max LTV; then wait long enough for lazy accrual to push HF < 1.
+    // Borrow close to max LTV; then wait long enough for lazy accrual to push debt above 80%.
     await poolB.write.borrow([1400n * 10n ** 18n - 1n]);
     await usdt.write.demoMint([liquidator.account.address, 2000n * 10n ** 18n]);
     await usdtLiquidator.write.approve([pool.address, 2000n * 10n ** 18n]);
@@ -284,7 +284,7 @@ describe("LendingPool", () => {
     await testClient.increaseTime({ seconds: 7 * 365 * 24 * 60 * 60 });
     await testClient.mine({ blocks: 1 });
 
-    // liquidate() normalizes debt before checking HF, so compare against normalized (virtual) debt.
+    // liquidate() normalizes debt before checking the 80% risk line, so compare against virtual debt.
     const debtBefore = await pool.read.getDebtValue([b.account.address]);
     await poolLiquidator.write.liquidate([b.account.address, 100n * 10n ** 18n]);
     const debtAfter = await pool.read.debtUSDT([b.account.address]);

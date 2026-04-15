@@ -1,0 +1,3 @@
+export const ANALYTICS_POLL_MS = 5_000;
+export const POSITION_REFETCH_MS = 10_000;
+export const LIQUIDATION_SCAN_STALE_MS = 12_000;

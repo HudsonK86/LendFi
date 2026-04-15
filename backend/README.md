@@ -1,4 +1,4 @@
-# LendFi Hardhat
+# LendFi Backend (Hardhat)
 
 ## Local node + deployments
 
@@ -20,7 +20,7 @@ npx hardhat ignition deploy ignition/modules/LendingPool.ts --network localhost
 
 Hardhat’s local node exposes **20 default accounts** — you **do not** need to fund all 20 unless you want to. Fund as many addresses as you need for testing.
 
-After `hardhat node` is running and contracts are deployed, from the `hardhat/` folder:
+After `hardhat node` is running and contracts are deployed, from the `backend/` folder:
 
 ```bash
 npm run mint:usdt

@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
+import { getJson } from "@/lib/api/http";
+import { getPoolActivityLabel, formatPoolActivityAmountBaseUnits } from "@/lib/events/poolActivity";
+import { shortAddress } from "@/lib/format/address";
+import { formatDateTime } from "@/lib/format/dateTime";
+import { ANALYTICS_POLL_MS } from "@/lib/polling";
 import { card } from "@/lib/ui";
 
 type ProtocolAnalyticsResponse = {
@@ -32,20 +37,6 @@ type ProtocolAnalyticsResponse = {
   notes: string;
   error?: string;
 };
-
-function fmtTime(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-}
 
 function compactBucketLabel(value: string): string {
   // yyyy-mm-dd hh:00:00 -> hh:00 ; yyyy-mm-dd -> mm-dd
@@ -133,90 +124,25 @@ function buildPriceSeries(
   return raw;
 }
 
-function shortAddress(v: string | null | undefined): string {
-  if (!v) return "—";
-  return `${v.slice(0, 6)}...${v.slice(-4)}`;
-}
-
-function eventUnit(eventName: string): "ETH" | "USDT" | "RAW" {
-  if (eventName === "DepositCollateral" || eventName === "WithdrawCollateral") return "ETH";
-  if (
-    eventName === "DepositLiquidity" ||
-    eventName === "WithdrawLiquidity" ||
-    eventName === "Borrow" ||
-    eventName === "Repay" ||
-    eventName === "Liquidate"
-  ) {
-    return "USDT";
-  }
-  return "RAW";
-}
-
-function humanEventLabel(eventName: string): string {
-  switch (eventName) {
-    case "DepositLiquidity":
-      return "Deposit Liquidity (USDT)";
-    case "WithdrawLiquidity":
-      return "Withdraw Liquidity (USDT)";
-    case "DepositCollateral":
-      return "Deposit Collateral (ETH)";
-    case "WithdrawCollateral":
-      return "Withdraw Collateral (ETH)";
-    case "Borrow":
-      return "Borrow (USDT)";
-    case "Repay":
-      return "Repay (USDT)";
-    case "Liquidate":
-      return "Liquidate Position";
-    default:
-      return eventName;
-  }
-}
-
-function fmtAmountBaseUnits(amountBaseUnits: string | null, eventName: string): string {
-  if (!amountBaseUnits) return "—";
-  const unit = eventUnit(eventName);
-  if (unit === "RAW") return amountBaseUnits;
-
-  try {
-    const decimals = 18n;
-    const n = BigInt(amountBaseUnits);
-    const div = 10n ** decimals;
-    const whole = n / div;
-    const frac = (n % div).toString().padStart(Number(decimals), "0").slice(0, 4);
-    const wholeFmt = Number(whole).toLocaleString("en-US");
-    const fracTrimmed = frac.replace(/0+$/, "");
-    return fracTrimmed ? `${wholeFmt}.${fracTrimmed} ${unit}` : `${wholeFmt} ${unit}`;
-  } catch {
-    return `${amountBaseUnits} ${unit}`;
-  }
-}
-
 export function PoolAnalyticsPanel() {
   const [analytics, setAnalytics] = useState<ProtocolAnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const lastToastedError = useRef<string | null>(null);
   const [range, setRange] = useState<"24h" | "7d">("24h");
-  const [mounted, setMounted] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     let active = true;
     async function loadAnalytics() {
       try {
-        const res = await fetch(`/api/protocol/analytics?range=${range}`);
-        const data = (await res.json()) as ProtocolAnalyticsResponse & { error?: string };
+        const result = await getJson<ProtocolAnalyticsResponse>(`/api/protocol/analytics?range=${range}`);
         if (!active) return;
-        if (!res.ok) {
-          setError(data.error ?? "Failed to load protocol analytics");
+        if (!result.ok) {
+          setError(result.error ?? "Failed to load protocol analytics");
           setAnalytics(null);
           return;
         }
-        setAnalytics(data);
+        setAnalytics(result.data);
         setError(null);
       } catch {
         if (active) setError("Failed to load protocol analytics");
@@ -224,7 +150,7 @@ export function PoolAnalyticsPanel() {
     }
 
     void loadAnalytics();
-    const id = setInterval(() => void loadAnalytics(), 5000);
+    const id = setInterval(() => void loadAnalytics(), ANALYTICS_POLL_MS);
     return () => {
       active = false;
       clearInterval(id);
@@ -251,41 +177,24 @@ export function PoolAnalyticsPanel() {
   const hourly = analytics?.hourlyActivity ?? [];
   const chartSeries = analytics ? buildSeries(hourly, analytics.range) : [];
   const maxHourly = chartSeries.reduce((m, p) => (p.count > m ? p.count : m), 0);
-  const eventMix = analytics?.protocolEventCounts ?? [];
+  const eventMix = useMemo(() => analytics?.protocolEventCounts ?? [], [analytics?.protocolEventCounts]);
   const maxEventCount = eventMix.reduce((m, p) => (p.count > m ? p.count : m), 0);
   const availableEvents = useMemo(() => eventMix.map((e) => e.event), [eventMix]);
-
-  useEffect(() => {
-    setSelectedEvents((prev) => {
-      if (availableEvents.length === 0) {
-        return prev.length === 0 ? prev : [];
-      }
-      const next = prev.filter((e) => availableEvents.includes(e));
-      if (next.length === prev.length && next.every((v, i) => v === prev[i])) return prev;
-      return next;
-    });
-  }, [availableEvents]);
+  const activeSelectedEvents = useMemo(
+    () => selectedEvents.filter((eventName) => availableEvents.includes(eventName)),
+    [selectedEvents, availableEvents],
+  );
 
   const filteredActivity =
-    selectedEvents.length === 0
+    activeSelectedEvents.length === 0
       ? analytics?.recentProtocolActivity ?? []
-      : (analytics?.recentProtocolActivity ?? []).filter((r) => selectedEvents.includes(r.event_name));
+      : (analytics?.recentProtocolActivity ?? []).filter((r) => activeSelectedEvents.includes(r.event_name));
   const priceSeries = analytics ? buildPriceSeries(analytics.marketSeries ?? [], analytics.range) : [];
   const maxOracle = priceSeries.reduce((m, p) => Math.max(m, p.oracle), 0);
   const maxFr = priceSeries.reduce((m, p) => Math.max(m, p.fr), 0);
   const latestMarket = analytics?.marketSeries?.[analytics.marketSeries.length - 1];
   const latestOraclePrice = latestMarket ? parseFixed18(latestMarket.oraclePriceBaseUnits) : undefined;
   const latestFrNav = latestMarket ? parseFixed18(latestMarket.frNavBaseUnits) : undefined;
-
-  if (!mounted) {
-    return (
-      <section className={`${card} mt-8`}>
-        <h2 className="text-base font-semibold text-slate-100">Protocol activity analytics</h2>
-        <p className="mt-1 text-xs text-slate-500">Indexed from on-chain pool events into PostgreSQL.</p>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </section>
-    );
-  }
 
   return (
     <section className={`${card} mt-8`}>
@@ -413,7 +322,7 @@ export function PoolAnalyticsPanel() {
                     return (
                       <li key={row.event}>
                         <div className="mb-1 flex justify-between">
-                          <span>{humanEventLabel(row.event)}</span>
+                          <span>{getPoolActivityLabel(row.event)}</span>
                           <span className="tabular-nums text-slate-400">{row.count}</span>
                         </div>
                         <div className="h-2 rounded bg-slate-800">
@@ -586,12 +495,12 @@ export function PoolAnalyticsPanel() {
                       )
                     }
                     className={`rounded border px-2 py-1 ${
-                      selected
+                      selected && activeSelectedEvents.includes(eventName)
                         ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
                         : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    {humanEventLabel(eventName)}
+                    {getPoolActivityLabel(eventName)}
                   </button>
                 );
               })}
@@ -607,8 +516,8 @@ export function PoolAnalyticsPanel() {
                       LIQ
                     </span>
                   ) : null}
-                  {fmtTime(r.created_at)} · {humanEventLabel(r.event_name)} · user {shortAddress(r.user_address)} · amt{" "}
-                  {fmtAmountBaseUnits(r.amount_base_units, r.event_name)} ·{" "}
+                  {formatDateTime(r.created_at)} · {getPoolActivityLabel(r.event_name)} · user {shortAddress(r.user_address)} · amt{" "}
+                  {formatPoolActivityAmountBaseUnits(r.amount_base_units, r.event_name)} ·{" "}
                   <button
                     type="button"
                     onClick={() => void copyTxHash(r.tx_hash)}

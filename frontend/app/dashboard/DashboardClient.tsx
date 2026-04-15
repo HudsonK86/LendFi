@@ -7,15 +7,21 @@ import { toast } from "react-toastify";
 
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
-import { FRToken_ABI, LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { FRToken_ABI, LendingPool_ABI, MockUSDT_ABI } from "@/abi";
+import { getPoolActivityLabel, formatPoolActivityAmountBaseUnits } from "@/lib/events/poolActivity";
+import { shortAddress } from "@/lib/format/address";
+import { formatDateTime } from "@/lib/format/dateTime";
+import { getJson } from "@/lib/api/http";
+import { ANALYTICS_POLL_MS } from "@/lib/polling";
+import { CONTRACT_ADDRESSES } from "@/utils/smartContractAddress";
 import { debtToCollateralRatioBps, formatBpsAsPercent, isDebtAboveLiquidationLine } from "@/lib/protocol-params";
 import { card, shell } from "@/lib/ui";
 import { BorrowClient } from "../borrow/BorrowClient";
 import { PoolClient } from "../pool/PoolClient";
 
-const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
-const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
-const frTokenAddress = process.env.NEXT_PUBLIC_FRTOKEN_ADDRESS as `0x${string}` | undefined;
+const lendingPoolAddress = CONTRACT_ADDRESSES.lendingPool;
+const usdtAddress = CONTRACT_ADDRESSES.mockUsdt;
+const frTokenAddress = CONTRACT_ADDRESSES.frToken;
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";
@@ -202,10 +208,11 @@ export function DashboardClient() {
       }
       setTxLoading(true);
       try {
-        const res = await fetch(`/api/protocol/user-transactions?address=${address.toLowerCase()}&limit=20`);
-        const data = (await res.json()) as { items?: typeof recentTx };
+        const result = await getJson<{ items?: typeof recentTx }>(
+          `/api/protocol/user-transactions?address=${address.toLowerCase()}&limit=20`,
+        );
         if (!active) return;
-        setRecentTx(data.items ?? []);
+        setRecentTx(result.ok ? result.data.items ?? [] : []);
       } catch {
         if (active) setRecentTx([]);
       } finally {
@@ -213,7 +220,7 @@ export function DashboardClient() {
       }
     }
     void loadUserTx();
-    const id = setInterval(() => void loadUserTx(), 5000);
+    const id = setInterval(() => void loadUserTx(), ANALYTICS_POLL_MS);
     return () => {
       active = false;
       clearInterval(id);
@@ -227,75 +234,6 @@ export function DashboardClient() {
     }
     setSelectedTxEvents((prev) => prev.filter((e) => txEventOptions.includes(e)));
   }, [txEventOptions]);
-
-  function humanEventLabel(eventName: string): string {
-    switch (eventName) {
-      case "DepositLiquidity":
-        return "Deposit Liquidity (USDT)";
-      case "WithdrawLiquidity":
-        return "Withdraw Liquidity (USDT)";
-      case "DepositCollateral":
-        return "Deposit Collateral (ETH)";
-      case "WithdrawCollateral":
-        return "Withdraw Collateral (ETH)";
-      case "Borrow":
-        return "Borrow (USDT)";
-      case "Repay":
-        return "Repay (USDT)";
-      case "Liquidate":
-        return "Liquidate Position";
-      default:
-        return eventName;
-    }
-  }
-
-  function shortAddress(v: string | null | undefined): string {
-    if (!v) return "—";
-    return `${v.slice(0, 6)}...${v.slice(-4)}`;
-  }
-
-  function fmtTime(value: string): string {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  }
-
-  function eventUnit(eventName: string): "ETH" | "USDT" | "RAW" {
-    if (eventName === "DepositCollateral" || eventName === "WithdrawCollateral") return "ETH";
-    if (
-      eventName === "DepositLiquidity" ||
-      eventName === "WithdrawLiquidity" ||
-      eventName === "Borrow" ||
-      eventName === "Repay" ||
-      eventName === "Liquidate"
-    ) {
-      return "USDT";
-    }
-    return "RAW";
-  }
-
-  function fmtAmount(base: string | null, eventName: string): string {
-    if (!base) return "—";
-    const unit = eventUnit(eventName);
-    if (unit === "RAW") return base;
-    try {
-      const n = BigInt(base);
-      const whole = n / 10n ** 18n;
-      const frac = (n % 10n ** 18n).toString().padStart(18, "0").slice(0, 4).replace(/0+$/, "");
-      const wholeFmt = Number(whole).toLocaleString("en-US");
-      return frac ? `${wholeFmt}.${frac} ${unit}` : `${wholeFmt} ${unit}`;
-    } catch {
-      return `${base} ${unit}`;
-    }
-  }
 
   async function copyTxHash(hash: string) {
     try {
@@ -540,7 +478,7 @@ export function DashboardClient() {
                     : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200"
                 }`}
               >
-                {humanEventLabel(eventName)}
+                {getPoolActivityLabel(eventName)}
               </button>
             );
           })}
@@ -552,8 +490,8 @@ export function DashboardClient() {
           ) : null}
           {filteredRecentTx.map((r) => (
             <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
-              {fmtTime(r.created_at)} · {humanEventLabel(r.event_name)} · user {shortAddress(r.user_address)} · amt{" "}
-              {fmtAmount(r.amount_base_units, r.event_name)} ·{" "}
+              {formatDateTime(r.created_at)} · {getPoolActivityLabel(r.event_name)} · user {shortAddress(r.user_address)} · amt{" "}
+              {formatPoolActivityAmountBaseUnits(r.amount_base_units, r.event_name)} ·{" "}
               <button
                 type="button"
                 onClick={() => void copyTxHash(r.tx_hash)}

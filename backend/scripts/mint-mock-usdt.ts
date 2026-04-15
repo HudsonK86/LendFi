@@ -1,9 +1,6 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import hre from "hardhat";
 import { isAddress, parseUnits } from "viem";
+import { readDeployedAddressesFromScript, requireDeployedAddress } from "./lib/deployments.js";
 
 type Args = {
   network?: string;
@@ -96,23 +93,14 @@ function parseArgs(argv: string[]): Args {
 }
 
 async function defaultUsdtFromIgnition(): Promise<`0x${string}`> {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const deployed = path.join(
-    __dirname,
-    "..",
-    "ignition",
-    "deployments",
-    "chain-31337",
-    "deployed_addresses.json",
-  );
-  const raw = JSON.parse(await fs.readFile(deployed, "utf8")) as Record<string, string>;
-  const addr = raw["MockUSDTModule#MockUSDT"];
-  if (!addr || !isAddress(addr)) {
+  const raw = await readDeployedAddressesFromScript(import.meta.url);
+  const deployedAddr = raw["MockUSDTModule#MockUSDT"];
+  if (!deployedAddr || !isAddress(deployedAddr)) {
     throw new Error(
-      `Could not read MockUSDT address from ${deployed}. Deploy contracts or pass --usdt.`,
+      "Could not read MockUSDT address from ignition deployments. Deploy contracts or pass --usdt.",
     );
   }
-  return addr;
+  return requireDeployedAddress(raw, "MockUSDTModule#MockUSDT");
 }
 
 const args = parseArgs(process.argv.slice(2));

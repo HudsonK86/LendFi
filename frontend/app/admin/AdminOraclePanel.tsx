@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "react-toastify";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import {
   useAccount,
@@ -10,18 +9,15 @@ import {
   useWriteContract,
 } from "wagmi";
 
-import { MockPriceOracle_ABI } from "@/lib/abi";
+import { MockPriceOracle_ABI } from "@/abi";
+import { shortAddress } from "@/lib/format/address";
 import { btnPrimary, code, input, label } from "@/lib/ui";
+import { appToast } from "@/utils/toast";
 
 const PRICE_DECIMALS = 18;
 
 const oracleAddress = process.env.NEXT_PUBLIC_MOCK_PRICE_ORACLE_ADDRESS as `0x${string}` | undefined;
 const configuredAdminWallet = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS as `0x${string}` | undefined;
-
-function shortAddress(address?: string): string {
-  if (!address) return "not set";
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
 
 type OracleLogSnapshot = {
   previousPriceHuman: string;
@@ -40,10 +36,10 @@ export function AdminOraclePanel() {
   const loggedTxHashes = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isConfirmed) toast.success("Oracle price update confirmed");
+    if (isConfirmed) appToast.success("Oracle price update confirmed");
   }, [isConfirmed]);
   useEffect(() => {
-    if (writeError) toast.error(writeError.message);
+    if (writeError) appToast.error(writeError.message);
   }, [writeError]);
 
   useEffect(() => {
@@ -70,10 +66,10 @@ export function AdminOraclePanel() {
         });
         if (!res.ok) {
           const err = (await res.json().catch(() => ({}))) as { error?: string };
-          toast.warn(err.error ?? "Could not save admin audit log (on-chain update still succeeded).");
+          appToast.warn(err.error ?? "Could not save admin audit log (on-chain update still succeeded).");
         }
       } catch {
-        toast.warn("Could not save admin audit log (on-chain update still succeeded).");
+        appToast.warn("Could not save admin audit log (on-chain update still succeeded).");
       }
     })();
   }, [isConfirmed, hash]);
@@ -125,7 +121,7 @@ export function AdminOraclePanel() {
     if (!canWrite || !oracleAddress) return;
     if (!priceWei) {
       if (nextPrice.trim()) {
-        toast.error("Enter a valid price (USDT per 1 ETH), e.g. 2000 or 1999.5");
+        appToast.error("Enter a valid price (USDT per 1 ETH), e.g. 2000 or 1999.5");
       }
       return;
     }
@@ -154,7 +150,7 @@ export function AdminOraclePanel() {
         </p>
         <p>
           Authorized wallet{" "}
-          <code className={code}>{shortAddress(authorizedWallet)}</code>
+          <code className={code}>{shortAddress(authorizedWallet, "not set")}</code>
           <span className="ml-2 text-xs text-slate-500">(env or on-chain owner)</span>
         </p>
         <div className="rounded-lg border border-slate-800/80 bg-slate-950/50 p-3">

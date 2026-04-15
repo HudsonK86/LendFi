@@ -14,7 +14,8 @@ import {
 } from "wagmi";
 
 import { PageHeader } from "@/components/PageHeader";
-import { LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { LendingPool_ABI, MockUSDT_ABI } from "@/abi";
+import { POSITION_REFETCH_MS } from "@/lib/polling";
 import {
   LIQUIDATION_THRESHOLD_BPS,
   debtToCollateralRatioBps,
@@ -24,12 +25,10 @@ import {
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { StatTile } from "@/components/StatTile";
 import { btnNeutral, btnPrimary, card, code, input, label, shell } from "@/lib/ui";
+import { CONTRACT_ADDRESSES } from "@/utils/smartContractAddress";
 
-const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
-const usdtAddress = process.env.NEXT_PUBLIC_MOCK_USDT_ADDRESS as `0x${string}` | undefined;
-
-/** RPC refresh for time-dependent debt / health reads; interest accrues per second on-chain. */
-const POSITION_REFETCH_MS = 10_000;
+const lendingPoolAddress = CONTRACT_ADDRESSES.lendingPool;
+const usdtAddress = CONTRACT_ADDRESSES.mockUsdt;
 
 function fmt(value?: bigint, decimals = 18, digits = 4) {
   if (value == null) return "—";

@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "react-toastify";
 
+import { getJson } from "@/lib/api/http";
+import { formatDateTime } from "@/lib/format/dateTime";
+import { ANALYTICS_POLL_MS } from "@/lib/polling";
 import type { AdminActionLog } from "@/lib/types";
 import { card } from "@/lib/ui";
+import { appToast } from "@/utils/toast";
 
 type AnalyticsResponse = {
   recentActions: AdminActionLog[];
@@ -26,20 +29,6 @@ function formatOracleLogDetails(action: string, details: string | null): string 
   }
 }
 
-function fmtTime(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-}
-
 export function AdminAnalyticsPanel() {
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
@@ -49,27 +38,26 @@ export function AdminAnalyticsPanel() {
     let active = true;
     async function loadAnalytics() {
       try {
-        const res = await fetch("/api/admin/analytics", { credentials: "include" });
-        const data = (await res.json()) as AnalyticsResponse & { error?: string };
+        const result = await getJson<AnalyticsResponse>("/api/admin/analytics", { credentials: "include" });
         if (!active) return;
-        if (res.status === 401) {
+        if (!result.ok && result.status === 401) {
           setAnalyticsError("Sign in as admin to view analytics.");
           setAnalytics(null);
           return;
         }
-        if (!res.ok) {
-          setAnalyticsError(data.error ?? "Failed to load analytics");
+        if (!result.ok) {
+          setAnalyticsError(result.error ?? "Failed to load analytics");
           setAnalytics(null);
           return;
         }
-        setAnalytics(data);
+        setAnalytics(result.data);
         setAnalyticsError(null);
       } catch {
         if (active) setAnalyticsError("Failed to load analytics");
       }
     }
     void loadAnalytics();
-    const id = setInterval(() => void loadAnalytics(), 5000);
+    const id = setInterval(() => void loadAnalytics(), ANALYTICS_POLL_MS);
     return () => {
       active = false;
       clearInterval(id);
@@ -79,7 +67,7 @@ export function AdminAnalyticsPanel() {
   useEffect(() => {
     if (analyticsError && analyticsError !== lastToastedError.current) {
       lastToastedError.current = analyticsError;
-      toast.error(analyticsError);
+      appToast.error(analyticsError);
     }
     if (!analyticsError) lastToastedError.current = null;
   }, [analyticsError]);
@@ -100,7 +88,7 @@ export function AdminAnalyticsPanel() {
                 return (
                   <li key={r.id} className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 font-mono">
                     <div>
-                      {fmtTime(r.created_at)} · {r.username} · {r.action}
+                      {formatDateTime(r.created_at)} · {r.username} · {r.action}
                     </div>
                     {oracleLine ? <div className="mt-1 text-[11px] text-slate-500">{oracleLine}</div> : null}
                   </li>

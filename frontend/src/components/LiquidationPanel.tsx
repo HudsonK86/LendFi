@@ -12,8 +12,9 @@ import {
   useWriteContract,
 } from "wagmi";
 
-import { LendingPool_ABI, MockUSDT_ABI } from "@/lib/abi";
+import { LendingPool_ABI, MockUSDT_ABI } from "@/abi";
 import { getLiquidationScanAddresses } from "@/lib/liquidation-scan-addresses";
+import { LIQUIDATION_SCAN_STALE_MS } from "@/lib/polling";
 import { btnNeutral, btnPrimary, card, input, label } from "@/lib/ui";
 
 const lendingPoolAddress = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}` | undefined;
@@ -87,7 +88,7 @@ export function LiquidationPanel({
     contracts: scanContracts,
     query: {
       enabled: Boolean(lendingPoolAddress && scanContracts.length > 0),
-      staleTime: 12_000,
+      staleTime: LIQUIDATION_SCAN_STALE_MS,
     },
   });
 

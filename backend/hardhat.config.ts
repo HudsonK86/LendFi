@@ -16,6 +16,13 @@ setMockCacheDir(path.join(__dirname, ".hardhat-test-cache"));
 
 export default defineConfig({
   plugins: [hardhatToolboxViem, hardhatNodeTestRunner],
+  networks: {
+    localhost: {
+      type: "http",
+      chainId: 31337,
+      url: "http://127.0.0.1:8545",
+    },
+  },
   solidity: {
     version: "0.8.28",
     settings: {
