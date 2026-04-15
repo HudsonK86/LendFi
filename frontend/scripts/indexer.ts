@@ -18,6 +18,17 @@ type PoolActivityArgs = {
   raw: Record<string, unknown>;
 };
 
+type DecodedLendingPoolEvent = {
+  eventName: string;
+  args: Record<string, unknown>;
+};
+
+type IndexerMeta = {
+  chainId: string | null;
+  genesisHash: string | null;
+  contractAddress: string | null;
+};
+
 const BATCH_SIZE = 2_000n;
 
 function jsonStringifyBigInt(value: unknown): string {
@@ -63,7 +74,57 @@ async function setLastIndexedBlock(block: bigint): Promise<void> {
   );
 }
 
-function normalizeEvent(log: Log, decoded: ReturnType<typeof decodeEventLog>): PoolActivityArgs {
+async function getIndexerMeta(): Promise<IndexerMeta> {
+  const pool = getPool();
+  const res = await pool.query<{ key: string; value: string }>(
+    `
+    SELECT key, value
+    FROM indexer_state
+    WHERE key IN ('chain_id', 'genesis_hash', 'indexed_contract_address')
+    `,
+  );
+
+  let chainId: string | null = null;
+  let genesisHash: string | null = null;
+  let contractAddress: string | null = null;
+
+  for (const row of res.rows) {
+    if (row.key === "chain_id") chainId = row.value;
+    if (row.key === "genesis_hash") genesisHash = row.value;
+    if (row.key === "indexed_contract_address") contractAddress = row.value;
+  }
+
+  return { chainId, genesisHash, contractAddress };
+}
+
+async function setIndexerMeta(meta: {
+  chainId: number;
+  genesisHash: string;
+  contractAddress: string;
+}): Promise<void> {
+  const pool = getPool();
+  await pool.query(
+    `
+    INSERT INTO indexer_state (key, value)
+    VALUES
+      ('chain_id', $1),
+      ('genesis_hash', $2),
+      ('indexed_contract_address', $3)
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `,
+    [String(meta.chainId), meta.genesisHash.toLowerCase(), meta.contractAddress.toLowerCase()],
+  );
+}
+
+async function resetIndexedData(): Promise<void> {
+  const pool = getPool();
+  await pool.query(
+    "TRUNCATE TABLE pool_activity, pool_market_snapshots, admin_action_logs RESTART IDENTITY",
+  );
+  await setLastIndexedBlock(0n);
+}
+
+function normalizeEvent(log: Log, decoded: DecodedLendingPoolEvent): PoolActivityArgs {
   const { eventName, args } = decoded as { eventName: string; args: any };
   const raw: Record<string, unknown> = { eventName, args };
 
@@ -116,6 +177,12 @@ function normalizeEvent(log: Log, decoded: ReturnType<typeof decodeEventLog>): P
   return { eventName, userAddress, counterpartyAddress, amountBaseUnits, raw };
 }
 
+function isDecodedLendingPoolEvent(value: unknown): value is DecodedLendingPoolEvent {
+  if (typeof value !== "object" || value == null) return false;
+  const maybe = value as { eventName?: unknown; args?: unknown };
+  return typeof maybe.eventName === "string" && typeof maybe.args === "object" && maybe.args != null;
+}
+
 async function indexOnce(): Promise<boolean> {
   const rpcUrl = await getEnv("NEXT_PUBLIC_RPC_URL");
   const lendingPoolAddress = (await getEnv(
@@ -130,6 +197,29 @@ async function indexOnce(): Promise<boolean> {
   });
 
   const chainId = await client.getChainId();
+  const genesisBlock = await client.getBlock({ blockNumber: 0n });
+  const genesisHash = (genesisBlock.hash ?? "").toLowerCase();
+  const normalizedContractAddress = lendingPoolAddress.toLowerCase();
+
+  const meta = await getIndexerMeta();
+  const chainChanged = meta.chainId != null && meta.chainId !== String(chainId);
+  const genesisChanged = meta.genesisHash != null && meta.genesisHash !== genesisHash;
+  const contractChanged =
+    meta.contractAddress != null && meta.contractAddress !== normalizedContractAddress;
+
+  if (chainChanged || genesisChanged || contractChanged) {
+    console.warn(
+      `Indexer session changed (chain=${chainChanged}, genesis=${genesisChanged}, contract=${contractChanged}); clearing indexed tables and resetting checkpoint.`,
+    );
+    await resetIndexedData();
+  }
+
+  await setIndexerMeta({
+    chainId,
+    genesisHash,
+    contractAddress: normalizedContractAddress,
+  });
+
   const currentBlock = await client.getBlockNumber();
   let lastIndexed = await getLastIndexedBlock();
 
@@ -185,7 +275,7 @@ async function indexOnce(): Promise<boolean> {
       });
 
       // Only handle known events from this contract
-      if (!decoded.eventName) continue;
+      if (!isDecodedLendingPoolEvent(decoded)) continue;
 
       const norm = normalizeEvent(log, decoded);
       const rawJson = jsonStringifyBigInt(norm.raw);
