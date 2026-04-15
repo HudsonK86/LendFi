@@ -8,7 +8,6 @@ import { card } from "@/lib/ui";
 
 type AnalyticsResponse = {
   recentActions: AdminActionLog[];
-  notes: string;
   error?: string;
 };
 
@@ -87,15 +86,13 @@ export function AdminAnalyticsPanel() {
 
   return (
     <section className={`${card} mt-10`}>
-      <h2 className="text-base font-semibold text-slate-100">Historical analytics</h2>
-      <p className="mt-1 text-xs text-slate-500">PostgreSQL-backed admin logs.</p>
+      <h2 className="text-base font-semibold text-slate-100">Oracle Price History</h2>
+      <p className="mt-1 text-xs text-slate-500">Recent admin updates to oracle ETH/USDT price.</p>
       {!analytics ? (
         <p className="mt-4 text-sm text-slate-500">{analyticsError ? "Unable to load." : "Loading…"}</p>
       ) : (
         <>
-          <p className="mt-3 text-sm text-slate-400">{analytics.notes}</p>
           <div className="mt-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent actions</h3>
             <ul className="mt-3 max-h-56 space-y-2 overflow-auto text-xs text-slate-400">
               {analytics.recentActions.length === 0 ? <li>No recent actions.</li> : null}
               {analytics.recentActions.map((r) => {
