@@ -1,4 +1,4 @@
-# LendFi Hha
+# LendFi 
 
 LendFi is a full-stack lending protocol demo with:
 
