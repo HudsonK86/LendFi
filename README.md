@@ -6,6 +6,76 @@ LendFi is a full-stack lending protocol demo with:
 - Web app and indexer in `frontend/`
 - PostgreSQL schema in `db/schema.sql`
 
+## Codebase structure (beginner friendly)
+
+This project has 3 major parts:
+
+1. `backend/` - smart contracts, tests, and deployment scripts
+2. `frontend/` - Next.js web app, API routes, and indexer
+3. `db/` - PostgreSQL schema for analytics/admin data
+
+```text
+LendFi/
+├─ backend/                     # Hardhat workspace
+│  ├─ contracts/                # Solidity contracts
+│  │  ├─ LendingPool.sol        # Core lending logic
+│  │  ├─ FRToken.sol            # Pool share token
+│  │  ├─ MockUSDT.sol           # Test stablecoin
+│  │  └─ MockPriceOracle.sol    # Test ETH/USDT oracle
+│  ├─ ignition/modules/         # Deployment modules
+│  ├─ scripts/                  # Deploy/mint/env sync helpers
+│  ├─ test/                     # Contract tests
+│  └─ hardhat.config.ts         # Backend config
+│
+├─ frontend/                    # Next.js app
+│  ├─ app/                      # Routes + pages + API endpoints
+│  │  ├─ pool/                  # Supply/withdraw module
+│  │  ├─ borrow/                # Borrow/repay/collateral module
+│  │  ├─ dashboard/             # Account + protocol overview
+│  │  └─ api/                   # Server endpoints (admin/analytics)
+│  ├─ src/
+│  │  ├─ components/            # Reusable UI blocks
+│  │  ├─ context/               # Web3 provider context
+│  │  ├─ abi/                   # ABI facade exports
+│  │  ├─ utils/                 # Utility helpers
+│  │  └─ lib/                   # Shared domain/app logic
+│  └─ scripts/indexer.ts        # Blockchain event indexer -> DB
+│
+├─ db/
+│  └─ schema.sql                # Tables for admin + analytics
+└─ README.md
+```
+
+## Architecture (how data flows)
+
+In simple terms:
+
+- Blockchain (`backend`) stores the real lending state.
+- Frontend (`frontend`) lets users interact with contracts.
+- Database (`db`) stores indexed history and analytics for fast querying.
+
+End-to-end flow:
+
+1. User clicks an action in UI (deposit, borrow, repay, liquidate).
+2. Wallet signs and sends transaction to the local chain.
+3. Contract state changes on-chain.
+4. Contracts emit events.
+5. `frontend/scripts/indexer.ts` reads events and writes rows into PostgreSQL tables.
+6. Dashboard/Admin pages read DB plus on-chain values and render metrics.
+
+Why both blockchain and DB:
+
+- Blockchain = source of truth for financial state.
+- Database = fast history/analytics queries that are expensive to do directly from chain.
+
+Recommended learning path for beginners:
+
+1. Read `backend/contracts/LendingPool.sol` (core protocol behavior).
+2. Read `backend/test/LendingPool.test.ts` (expected behavior and edge cases).
+3. Open `frontend/app/pool` and `frontend/app/borrow` (how UI triggers contract calls).
+4. Read `frontend/scripts/indexer.ts` (how events are transformed into DB rows).
+5. Check `db/schema.sql` (what data is stored and why).
+
 ## Core features
 
 - Shared liquidity pool where users deposit USDT and receive FRToken shares.
