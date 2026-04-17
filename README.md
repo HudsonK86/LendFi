@@ -6,7 +6,7 @@ LendFi is a full-stack lending protocol demo with:
 - Web app and indexer in `frontend/`
 - PostgreSQL schema in `db/schema.sql`
 
-## Codebase structure (beginner friendly)
+## Codebase structure
 
 This project has 3 major parts:
 
