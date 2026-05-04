@@ -1,8 +1,8 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-import MockUSDTModule from "./MockUSDT";
-import MockPriceOracleModule from "./MockPriceOracle";
-import FRTokenModule from "./FRToken";
+import MockUSDTModule from "./MockUSDT.js";
+import MockPriceOracleModule from "./MockPriceOracle.js";
+import FRTokenModule from "./FRToken.js";
 
 const LendingPoolModule = buildModule("LendingPoolModule", (m) => {
   const { mockUSDT } = m.useModule(MockUSDTModule);

@@ -1,4 +1,4 @@
-# LendFi 
+# LendFi
 
 LendFi is a full-stack lending protocol demo with:
 
@@ -102,7 +102,7 @@ Recommended learning path for beginners:
 
 ## Prerequisites
 
-- Node.js (LTS)
+- Node.js v22.22.1  (LTS)
 - npm
 - PostgreSQL (for frontend API/indexer analytics routes)
 
